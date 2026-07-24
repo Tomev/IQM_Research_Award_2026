@@ -139,9 +139,15 @@ def get_gates(backend: IQMBackend) -> dict[str, list[str]]:
         This method is slightly over the top, returning also measurements and variants of the gates. It, however
         should work with general backend.
     """
+    # A list of valid gates, as returned by the `IQMErrorProfile` error.
+    available_gates: list[str] = ["move", "prx", "cc_prx", "cz"]
+
     backend_gates: dict[str, list[str]] = {"1q": [], "2q": []}
 
     for gate_name, gate_data in backend.architecture.gates.items():
+        if gate_name not in available_gates:  # Skip unavailable gates
+            continue
+
         backend_gates[f"{len(gate_data.loci[-1])}q"].append(gate_name)
 
     return backend_gates
@@ -265,47 +271,7 @@ def FakeSirius() -> IQMFakeBackend:
 
 def main() -> None:
     """TODO(TR): Docstring"""
-    client: IQMClient = IQMClient(
-        iqm_server_url=os.environ["IQM_PROVIDER"],
-        quantum_computer=os.environ["IQM_COMPUTER"],  # sirius
-    )
-
-    provider: IQMProvider = IQMProvider(
-        os.environ["IQM_PROVIDER"],
-        quantum_computer=os.environ["IQM_COMPUTER"],
-    )
-
-    backend: IQMBackend = provider.get_backend()
-    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
-    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
-        calibration_set.observation_set_id
-    )
-
-    gates: dict[str, list[str]] = get_gates(backend)
-
-    depolarizing_errors: dict[str, dict[str, float]] = compute_two_qubit_gates_depolarizing_error_parameters(
-        quality_metric_set, gates["2q"]
-    )
-
-    for k, v in depolarizing_errors.items():
-        print(f"\n{k}: {v}")
-
-    print()
-    return
-
-    value_sought: str = ".prx."
-
-    print("\n\nCalibration:")
-
-    for observation in calibration_set.observations:
-        if value_sought in observation.dut_field and "QB17" in observation.dut_field:
-            print(f"\n{observation}\n")
-
-    print("\n\nQuality:")
-
-    for observation in quality_metric_set.observations:
-        if value_sought in observation.dut_field and "QB17" in observation.dut_field:
-            print(f"\n{observation}\n")
+    backend: IQMFakeBackend = FakeSirius()
 
 
 if __name__ == "__main__":
