@@ -1,5 +1,5 @@
 """
-A module containing functionalities for IQM `siruis` simulator creation. It's actually more general than that.
+A module containing functionalities for IQM `siruis` simulator creation. It p
 """
 
 import os
@@ -96,6 +96,21 @@ def get_ts(
     return ts
 
 
+def get_gates(backend: IQMBackend) -> dict[str, list[str]]:
+    """TODO(TR): Docstring
+
+    .. warning::
+        This method is slightly over the top, returning also measurements and variants of the gates. It, however
+        should work with general backend.
+    """
+    backend_gates: dict[str, list[str]] = {"1q": [], "2q": []}
+
+    for gate_name, gate_data in backend.architecture.gates.items():
+        backend_gates[f"{len(gate_data.loci[-1])}q"].append(gate_name)
+
+    return backend_gates
+
+
 def get_readout_errors(
     quality_metric_set: ObservationSetWithObservations,
 ) -> dict[str, dict[str, float]]:
@@ -147,22 +162,24 @@ def main() -> None:
         calibration_set.observation_set_id
     )
 
-    print(get_readout_errors(quality_metric_set))
-    return
-
     # for k, v in backend.architecture.gates.items():
     #    print(f"\n{k}: {v}")
 
-    value_sought: str = "error_1_to_0"
+    print(get_gates(backend))
+    return
 
-    """
+    value_sought: str = "duration"
+
+    print("\n\nCalibration:")
+
     for observation in calibration_set.observations:
-        if value_sought in observation.dut_field:
+        if value_sought in observation.dut_field and "QB17" in observation.dut_field:
             print(f"\n{observation}\n")
-    """
+
+    print("\n\nQuality:")
 
     for observation in quality_metric_set.observations:
-        if value_sought in observation.dut_field:
+        if value_sought in observation.dut_field and "QB17" in observation.dut_field:
             print(f"\n{observation}\n")
 
     # print(get_ts(quality_metric_set, "t1"))
