@@ -16,6 +16,8 @@ from iqm.station_control.interface.models import ObservationSetWithObservations
 
 TimeType = Literal["t1", "t2"]
 
+from numpy import average
+
 
 def get_architecture(system_name: str) -> StaticQuantumArchitecture:
     """TODO(TR): Docstring"""
@@ -67,17 +69,30 @@ def get_error_profile(system_name: str) -> IQMErrorProfile:
         quantum_computer=system_name,
     )
 
+    provider: IQMProvider = IQMProvider(
+        os.environ["IQM_PROVIDER"],
+        quantum_computer=system_name,
+    )
+    backend: IQMBackend = provider.get_backend()
+
     calibration_set: ObservationSetWithObservations = client.get_calibration_set()
     quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
         calibration_set.observation_set_id
     )
+
+    backend_gates: dict[str, list[str]] = get_gates(backend)
+
     return IQMErrorProfile(
         t1s=get_ts(quality_metric_set, "t1"),
         t2s=get_ts(quality_metric_set, "t2"),
         single_qubit_gate_depolarizing_error_parameters={},
         two_qubit_gate_depolarizing_error_parameters={},
-        single_qubit_gate_durations={},
-        two_qubit_gate_durations={},
+        single_qubit_gate_durations=get_gates_duration(
+            calibration_set, backend_gates["1q"]
+        ),
+        two_qubit_gate_durations=get_gates_duration(
+            calibration_set, backend_gates["2q"]
+        ),
         readout_errors=get_readout_errors(quality_metric_set),
     )
 
@@ -109,6 +124,34 @@ def get_gates(backend: IQMBackend) -> dict[str, list[str]]:
         backend_gates[f"{len(gate_data.loci[-1])}q"].append(gate_name)
 
     return backend_gates
+
+
+def get_gates_duration(
+    calibration_set: ObservationSetWithObservations, gates: list[str]
+) -> dict[str, float]:
+    """TODO(TR): Docstring
+
+    .. note::
+        In FakeVLQ it is a single number. In publicly defined IQM devices, the durations are defined for each qubit
+        (qubits pair), but seem to be the same for every qubit (qubit_pair). Just in case, we compute and return the
+        average for each gate.
+    """
+    gates_duration: dict[str, list[float]] = defaultdict(lambda: [])
+
+    for observation in calibration_set.observations:
+        if "duration" in observation.dut_field:
+            gate_name: str = observation.dut_field.split(".")[1]
+
+            if gate_name not in gates:  # Skip gates that are of no interest.
+                continue
+
+            gates_duration[gate_name].append(observation.value)
+
+            # print(f"\n{observation}\n")
+
+    return {
+        k: average(v) * 1e9 for k, v in gates_duration.items()
+    }  # convert seconds to nano seconds
 
 
 def get_readout_errors(
@@ -162,13 +205,9 @@ def main() -> None:
         calibration_set.observation_set_id
     )
 
-    # for k, v in backend.architecture.gates.items():
-    #    print(f"\n{k}: {v}")
+    gates: dict[str, list[str]] = get_gates(backend)
 
-    print(get_gates(backend))
-    return
-
-    value_sought: str = "duration"
+    value_sought: str = "fidelity"
 
     print("\n\nCalibration:")
 
@@ -181,9 +220,6 @@ def main() -> None:
     for observation in quality_metric_set.observations:
         if value_sought in observation.dut_field and "QB17" in observation.dut_field:
             print(f"\n{observation}\n")
-
-    # print(get_ts(quality_metric_set, "t1"))
-    # print(get_ts(quality_metric_set, "t2"))
 
 
 if __name__ == "__main__":
