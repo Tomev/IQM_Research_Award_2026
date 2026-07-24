@@ -267,14 +267,3 @@ def FakeFromBackend(system_name: str) -> IQMFakeBackend:
 def FakeSirius() -> IQMFakeBackend:
     """TODO(TR): Docstring"""
     return FakeFromBackend("sirius")
-
-
-def main() -> None:
-    """TODO(TR): Docstring"""
-    backend: IQMFakeBackend = FakeSirius()
-
-
-if __name__ == "__main__":
-    print("Start")
-    main()
-    print("Done")
