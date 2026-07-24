@@ -1,5 +1,5 @@
 """
-This script stores our Job classes. 
+This script stores our Job classes.
 """
 
 import os
@@ -67,7 +67,6 @@ class Job:
 
     # Zapis danych do pliku
     def save_to_file(self, csv_path, zip_filename):
-
         results = self.get_counts_from_job_results(self.queued_job)
 
         results = self.queued_job.result().get_counts()
@@ -140,8 +139,6 @@ class Job:
         return counts
 
 
-
-
 class TestJob(Job):
     """
     An abstract class for Test jobs.
@@ -156,32 +153,34 @@ class TestJob(Job):
         Adds test circuits to the job.
         """
         raise NotImplementedError
-    
+
     def save_to_file(self, csv_path, zip_filename):
-        result_counts=[]
-        
+        result_counts = []
+
         job_result = self.queued_job.result()
         for pub_result in job_result:
             for i in range(len(self.qubits_list)):
-                result_counts.append(getattr(pub_result.data, "cr"+str(i)).get_counts())
+                result_counts.append(
+                    getattr(pub_result.data, "cr" + str(i)).get_counts()
+                )
         pandas_table = pd.DataFrame.from_dict(result_counts).fillna(0)
 
-        indices_i=[]
-        indices_q=[]
+        indices_i = []
+        indices_q = []
 
-        for s in range(8*self.n_repetitions):
+        for s in range(8 * self.n_repetitions):
             for q in range(len(self.qubits_list)):
-                iva=self.indices_list[q][s]
+                iva = self.indices_list[q][s]
                 indices_i.append(iva)
                 indices_q.append(q)
         pandas_table["i"] = indices_i
         pandas_table["q"] = indices_q
-        
+
         # Saving to file
         pandas_table.to_csv(csv_path)
-        csv_filename = csv_path.split('/')[-1]
-        with ZipFile(zip_filename + '.zip', 'a') as plik_zip:
-            plik_zip.write(csv_path, arcname='results/' + csv_filename)
+        csv_filename = csv_path.split("/")[-1]
+        with ZipFile(zip_filename + ".zip", "a") as plik_zip:
+            plik_zip.write(csv_path, arcname="results/" + csv_filename)
         self.if_saved = True
 
         try:
@@ -189,7 +188,17 @@ class TestJob(Job):
         except Exception as alert:
             print(alert)
 
+
 class LGA(TestJob):
+    """
+
+    .. todo::
+        - Remove ecr-based implementation of LGA
+        - Add prx-based implementation of
+            - sx
+            - rz
+            - all the other remaining gates
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -201,7 +210,6 @@ class LGA(TestJob):
 
     @staticmethod
     def we(c: QuantumCircuit, i, j, eps):
-        
         c.ecr(i, j)
         c.rz(eps, j)
         c.ecr(i, j)
@@ -210,14 +218,15 @@ class LGA(TestJob):
         c.rz(np.pi / 2, j)
         c.sx(j)
         # We can skip the RZ rotation before the measurememt
-    #@staticmethod
-    #def we(c: QuantumCircuit, i, j, eps):
+
+    # @staticmethod
+    # def we(c: QuantumCircuit, i, j, eps):
     #    c.sx(j)
     #    c.rz(eps+np.pi/2, j)
     #    c.ecr(i, j)
     #    c.rz(np.pi/2,i)
     #    c.x(i)
-        
+
     def add_test_circuits(self, qubits_list: List[int], epp) -> None:
         self.qubits_list = qubits_list
         self._get_angles_lists()
@@ -243,16 +252,16 @@ class LGA(TestJob):
                 # print(par)
 
                 # Zdaje się, że a, b, c to flagi sterujące eksperymentem.
-                a = par % 2             # Liczenie kąta pomiaru na qubicie a
-                b = (par // 2) % 2      # Liczenie kąta pomiaru na qubicie b
+                a = par % 2  # Liczenie kąta pomiaru na qubicie a
+                b = (par // 2) % 2  # Liczenie kąta pomiaru na qubicie b
                 # Kolejność pomiarów słabych
-                c=par//4
+                c = par // 4
 
                 # print(f"a={a}, b={b}, c={c}")
 
                 # Wartości kątów w zależności od flagi. (-epp lub epp)
-                alpha = (2 * a - 1) * epp   # Kąt pomiaru na qubicie a
-                beta = (2 * b - 1) * epp    # Kąt pomiaru na qubicie b
+                alpha = (2 * a - 1) * epp  # Kąt pomiaru na qubicie a
+                beta = (2 * b - 1) * epp  # Kąt pomiaru na qubicie b
 
                 aa = np.pi / 4
                 bb = -np.pi / 4
@@ -268,11 +277,11 @@ class LGA(TestJob):
                     self.we(self.circuits[-1], q[0], q[2], beta)
                 else:
                     self.we(self.circuits[-1], q[0], q[2], beta)
-                    self.we(self.circuits[-1], q[0], q[1], alpha) 
+                    self.we(self.circuits[-1], q[0], q[1], alpha)
                 self.circuits[-1].z(q[0])
                 self.circuits[-1].sx(q[0])
                 self.circuits[-1].rz(np.pi / 4, q[0])
-                self.circuits[-1].sx(q[0])          
+                self.circuits[-1].sx(q[0])
                 self.circuits[-1].measure([q[0], q[1], q[2]], cr[i])
 
     def _get_angles_lists(self):
@@ -285,70 +294,61 @@ class LGA(TestJob):
             self.indices_list.append(self.va)
 
     def save_to_file(self, csv_path, zip_filename):
-        result_counts=[]
+        result_counts = []
         job_result = self.queued_job.result()
         for pub_result in job_result:
             for i in range(len(self.qubits_list)):
-                result_counts.append(getattr(pub_result.data, "cr"+str(i)).get_counts())
+                result_counts.append(
+                    getattr(pub_result.data, "cr" + str(i)).get_counts()
+                )
         pandas_table = pd.DataFrame.from_dict(result_counts).fillna(0)
-        indices_i=[]
-        indices_q=[]
-        #qubits_list=self.qubits_list
-        for s in range(8*self.n_repetitions):
+        indices_i = []
+        indices_q = []
+        # qubits_list=self.qubits_list
+        for s in range(8 * self.n_repetitions):
             for q in range(len(self.qubits_list)):
-                iva=self.indices_list[q][s]
+                iva = self.indices_list[q][s]
                 indices_i.append(iva)
                 indices_q.append(q)
         pandas_table["i"] = indices_i
         pandas_table["q"] = indices_q
-        
+
         # Saving to file
         pandas_table.to_csv(csv_path)
-        csv_filename = csv_path.split('/')[-1]
-        with ZipFile(zip_filename + '.zip', 'a') as plik_zip:
-            plik_zip.write(csv_path, arcname='results/' + csv_filename)
+        csv_filename = csv_path.split("/")[-1]
+        with ZipFile(zip_filename + ".zip", "a") as plik_zip:
+            plik_zip.write(csv_path, arcname="results/" + csv_filename)
         self.if_saved = True
 
         try:
             os.remove(csv_path)
         except Exception as alert:
             print(alert)
-        
-class LGASingleGate(LGA):
 
+
+class LGACZ(LGA):
     def __init__(self):
         super().__init__()
 
     @staticmethod
     def we(c: QuantumCircuit, i, j, eps):
         c.sx(j)
-        c.rz(eps + np.pi / 2, j)
-        c.ecr(i, j)
-        c.rz(np.pi / 2, i)
-        c.x(i)
-class LGACZ(LGA):
-
-    def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def we(c: QuantumCircuit, i, j, eps):   
-        c.sx(j)
         c.rz(eps + np.pi, j)
         c.sx(j)
-        c.cz(i,j)
+        c.cz(i, j)
         c.rz(-np.pi / 2, j)
         c.sx(j)
-class LGACZ2(LGA):
 
+
+class LGACZ2(LGA):
     def __init__(self):
         super().__init__()
 
     @staticmethod
-    def we(c: QuantumCircuit, i, j, eps):   
+    def we(c: QuantumCircuit, i, j, eps):
         c.cz(i, j)
         c.sx(j)
-        c.rz(eps+np.pi, j)
+        c.rz(eps + np.pi, j)
         c.sx(j)
         c.rz(np.pi, j)
         c.cz(i, j)
@@ -356,64 +356,28 @@ class LGACZ2(LGA):
         # Y_-
         c.rz(np.pi / 2, j)
         c.sx(j)
-class LGACZX(LGA):
 
+
+class LGACZX(LGA):
     def __init__(self):
         super().__init__()
 
     @staticmethod
-    def we(c: QuantumCircuit, i, j, eps):   
-        c.rx(eps,j)
-        c.cz(i,j)
+    def we(c: QuantumCircuit, i, j, eps):
+        c.rx(eps, j)
+        c.cz(i, j)
         c.rz(np.pi, j)
         c.sx(j)
-class LGACZ2X(LGA):
 
+
+class LGACZ2X(LGA):
     def __init__(self):
         super().__init__()
 
     @staticmethod
     def we(c: QuantumCircuit, i, j, eps):
         c.cz(i, j)
-        c.rx(eps,j)
-        c.cz(i,j)
+        c.rx(eps, j)
+        c.cz(i, j)
         c.rz(np.pi, j)
         c.sx(j)
-class LGAZZ(LGA):
-
-    def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def we(c: QuantumCircuit, i, j, eps):   
-        if eps>=0:
-            c.rz(-np.pi/2,j)
-            c.sx(j) 
-            c.rzz(eps,  i, j)
-            c.rz(np.pi/2,j)
-            c.sx(j)
-        else:
-            c.rz(np.pi/2,j)
-            c.sx(j)
-            c.rzz(-eps,  i, j)
-            c.rz(-np.pi/2,j)
-            c.sx(j)
-class LGAZZ0(LGA):
-
-    def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def we(c: QuantumCircuit, i, j, eps):   
-        if eps>=0:
-            c.rz(-np.pi/2,j)
-            c.sx(j) 
-            c.rzz(eps,  i, j)
-            c.rz(np.pi/2,j)
-            c.sx(j)
-        else:
-            c.rz(-np.pi/2,j)
-            c.sx(j) 
-            c.rzz(0,  i, j)
-            c.rz(np.pi/2,j)
-            c.sx(j)
