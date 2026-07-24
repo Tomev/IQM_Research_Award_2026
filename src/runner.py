@@ -5,20 +5,25 @@ from qiskit.primitives import StatevectorSampler
 from qiskit.providers.fake_provider import GenericBackendV2
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
-from qiskit_ibm_runtime import QiskitRuntimeService
-from qiskit_ibm_runtime import SamplerV2 as Sampler
 
-from src.jobs import LGACZ2
+from src.jobs import LGACZ2, Job
 
-# TODO(TR): There are some setting variables missing.
+# TODO(TR): Refactor those settings.
+N_JOBS: int = 1
+N_REPETITIONS: int = 1
+N_SHOTS: int = 10
+WAIT_TIME: int = 10  # TODO(TR): Adjust or remove.
+RESULTS_FOLDER_NAME: str = "./data"
+RESULTS_FILE_NAME: str = "job_list_lga_sim2zz.csv"
+ZIP_FILE_NAME: str = "iqm_lg_results.zip"
+
 
 def run_scripts():
-    jobs = []
+    """TODO(TR): Docstring this."""
+    jobs: list[Job] = []
     job_list_table = pd.DataFrame()
 
     # Job preparation
-    # ky
-    # qubits_list=[[6,5,7]]
     qubits_list = [[1, 0, 2]]
     for _ in range(N_JOBS):
         job = LGACZ2()
@@ -27,14 +32,17 @@ def run_scripts():
         jobs.append(job)
 
     i = 0
-    job_list_path = f"{RESULTS_FOLDER_NAME}/job_list_lga_sim2zz.csv"
+    job_list_path = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
+
     while i < N_JOBS:
         t = time.localtime()
         current_time = time.strftime("%H:%M:%S", t)
         print("Starting service")
-        tok, crn, nm = tcset[0]
-        service = QiskitRuntimeService(channel="ibm_cloud", instance=crn, token=tok)
-        print(i, nm)
+        ibm_token, crn, nm = tcset[0]
+        service = QiskitRuntimeService(
+            channel="ibm_cloud", instance=crn, token=ibm_token
+        )
+
         t = time.localtime()
         # backend = service.backend('ibm_kingston', use_fractional_gates=True)
         aer_sim = AerSimulator()
@@ -73,7 +81,9 @@ def run_scripts():
         except Exception as alert:
             print(alert)
             time.sleep(WAIT_TIME)
-    ndone = True
+
+    # TR: Main experimental loop
+    ndone: bool = True
 
     while ndone:
         ndone = False
@@ -92,9 +102,6 @@ def run_scripts():
         for i in range(N_JOBS):
             if jobs[i].last_status not in ["ERROR", "CANCELLED", "DONE"]:
                 ndone = True
-                # print(jobs[i].last_status)
-
-    experiments_cleen_up(job_list_path)
 
 
 def main():
