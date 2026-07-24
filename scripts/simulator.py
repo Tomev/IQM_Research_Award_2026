@@ -3,6 +3,7 @@ A module containing functionalities for IQM `siruis` simulator creation. It's ac
 """
 
 import os
+from typing import Literal
 
 from iqm.iqm_client import IQMClient, StaticQuantumArchitecture
 from iqm.qiskit_iqm import IQMBackend, IQMProvider
@@ -11,6 +12,8 @@ from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import (
     IQMFakeBackend,
 )
 from iqm.station_control.interface.models import ObservationSetWithObservations
+
+TimeType = Literal["t1", "t2"]
 
 
 def get_architecture(system_name: str) -> StaticQuantumArchitecture:
@@ -67,13 +70,29 @@ def get_error_profile(system_name: str) -> IQMErrorProfile:
     quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
         calibration_set.observation_set_id
     )
-    raise NotImplementedError
+    return IQMErrorProfile(
+        t1s=get_ts(quality_metric_set, "t1"),
+        t2s=get_ts(quality_metric_set, "t2"),
+        single_qubit_gate_depolarizing_error_parameters={},
+        two_qubit_gate_depolarizing_error_parameters={},
+        single_qubit_gate_durations={},
+        two_qubit_gate_durations={},
+        readout_errors={},
+    )
 
 
-def get_t1s(quality_metrics: ObservationSetWithObservations) -> dict[str, float]:
+def get_ts(
+    quality_metric_set: ObservationSetWithObservations, time_type: TimeType
+) -> dict[str, float]:
     """TODO(TR): Docstring"""
-    t1s: dict[str, float] = {}
-    raise NotImplementedError
+    ts: dict[str, float] = {}
+
+    for observation in quality_metric_set.observations:
+        if time_type in observation.dut_field:
+            component_name: str = observation.dut_field.split(".")[-2]
+            ts[component_name] = observation.value * 1e9  # seconds to nano seconds
+
+    return ts
 
 
 def FakeFromBackend(system_name: str) -> IQMFakeBackend:
@@ -102,12 +121,13 @@ def main() -> None:
     quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
         calibration_set.observation_set_id
     )
-    # print(calibration_set.observations)
-    # print(quality_metric_set)
 
     for x in quality_metric_set.observations:
         if "t1" in x.dut_field:
             print(f"\n{x}\n")
+
+    print(get_ts(quality_metric_set, "t1"))
+    print(get_ts(quality_metric_set, "t2"))
 
 
 if __name__ == "__main__":
