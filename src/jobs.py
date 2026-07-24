@@ -7,7 +7,6 @@ import random
 from abc import abstractmethod
 from zipfile import ZipFile
 
-import numpy as np
 import pandas as pd
 from numpy import pi
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
@@ -177,9 +176,6 @@ class LGA(TestJob):
                 # Wartości kątów w zależności od flagi. (-epp lub epp)
                 alpha = (2 * a - 1) * epp  # Kąt pomiaru na qubicie a
                 beta = (2 * b - 1) * epp  # Kąt pomiaru na qubicie b
-
-                aa = pi / 4
-                bb = -pi / 4
 
                 # Y_+ |0> = 1/sqrt(2) (|0> + |1>) state
                 self.circuits[-1].sx(q[0])
