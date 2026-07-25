@@ -5,7 +5,6 @@
 """
 
 import os
-from collections import defaultdict
 from itertools import combinations, permutations
 
 from iqm.iqm_client import IQMClient
@@ -29,12 +28,6 @@ def get_operation_errors(system_name: str) -> dict[str, float]:
         quantum_computer=system_name,
     )
 
-    provider: IQMProvider = IQMProvider(
-        os.environ["IQM_PROVIDER"],
-        quantum_computer=system_name,
-    )
-    backend: IQMBackend = provider.get_backend()
-
     calibration_set: ObservationSetWithObservations = client.get_calibration_set()
     quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
         calibration_set.observation_set_id
@@ -43,7 +36,7 @@ def get_operation_errors(system_name: str) -> dict[str, float]:
     operation_errors: dict[str, float] = {}
 
     for observation in quality_metric_set.observations:
-        if "tgss" in observation.dut_field or "qndness" in observation.dut_field:
+        if "qndness" in observation.dut_field:
             continue
 
         if ".fidelity" in observation.dut_field:
@@ -52,7 +45,6 @@ def get_operation_errors(system_name: str) -> dict[str, float]:
             if operation_name not in ["prx", "measure", "move", "cz"]:
                 continue
             operation_target = observation.dut_field.split(".")[-2]
-            # print(observation.dut_field)
 
             operation_errors[f"{operation_name}_{operation_target}"] = 1 - observation.value
 
@@ -75,7 +67,9 @@ class IQMStarCostEvaluator:
         self.backend: IQMBackend = backend
         self.circuit: QuantumCircuit = circuit
         self.operation_errors: dict[str, float] = get_operation_errors(backend.name)
-        print(self.operation_errors)
+
+        for k, v in self.operation_errors.items():
+            print(f"{k}: {v}")
 
     def _compile_circuit_for_layout(self, layout: list[int]) -> QuantumCircuit:
         """TODO(TR): Docstring"""
@@ -112,7 +106,7 @@ class IQMStarCostEvaluator:
 
         return circuit_cost
 
-    def get_top_layouts(self, n_layouts: int) -> list[list[int]]:
+    def get_top_layouts(self, n_layouts: int) -> list[tuple[list[int], float]]:
         """TODO(TR): Docstring"""
         layouts: list[list[int]] = []
 
@@ -121,78 +115,14 @@ class IQMStarCostEvaluator:
         # This is star topology, so each qubit is connected with each other qubit via the central resonator. We can
         # use that fact for the initial selection of the layouts.
         # Remember that order DOES matter, as qubits have different responsibilities and undergo different evolutions.
-        initial_layouts = list(permutations(qubit_indices, n_qubits))
-        print(len(list(initial_layouts)))
-
-        initial_layouts = initial_layouts[:1]
-
-        for layout in initial_layouts:
+        for layout in tqdm(permutations(qubit_indices, n_qubits)):
             compiled_qc: QuantumCircuit = self._compile_circuit_for_layout(layout)
             circuit_cost = self._compute_circuit_cost(compiled_qc)
-            print(circuit_cost)
+            layouts.append((layout, circuit_cost))
+            # print(circuit_cost)
 
-        return layouts
-
-
-def find_lgi_triplets(backend: IQMBackend) -> list[dict[str, int]]:
-    """
-    Given the IBM backend, find the qubit triplets for the Laggett-Garg test experiment.
-    We require that qubits X, A, B are connected in the following way:
-
-    X -> A
-
-    and
-
-    X -> B,
-
-    where the arrow denotes the direction of the entangling gate.
-
-    :params:
-        backend:     IBM backend.
-
-    :return:
-        A list of LGI-eligible qubit triplets.
-    """
-    lgi_triplets: list[dict[str, int]] = []
-
-    coupling_map = backend.coupling_map
-
-    def format_connection(con: list[list[int]]):
-        return {"x": con[0][0], "a": con[1][0], "b": con[1][1]}
-
-    for x in tqdm(range(backend.num_qubits)):
-        # Find all qubits that x can control.
-        connections = find_qubit_connections(backend, x)
-
-        if len(connections) < 2:
-            continue
-
-        if len(connections) > 2:
-            # Prepare 2-length permutations of the connections.
-            connections = list(combinations(connections, 2))
-        if len(connections) == 2:
-            connections = [connections]  # Hax for more general processing.
-
-        for con in connections:
-            lgi_triplets.append(format_connection([[x], con]))
-
-    return lgi_triplets
-
-
-def find_qubit_connections(backend: IQMBackend, qubit: int) -> list[int]:
-    """
-    Find all qubits that are connected to the given qubit.
-
-    :params:
-        backend:     IBM backend.
-        qubit:       The qubit to check connections for.
-
-    :return:
-        A list of connections in the backend that qubit controls.
-    """
-    coupling_map = backend.coupling_map
-
-    return [con[1] for con in coupling_map if con[0] == qubit]
+        layouts = sorted(layouts, key=lambda x: x[1])
+        return layouts[:n_layouts]
 
 
 def get_circuit() -> QuantumCircuit:
@@ -217,7 +147,9 @@ def main() -> None:
     cost_evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
 
     best_layouts: list[list[int]] = cost_evaluator.get_top_layouts(n_best_layouts)
-    print(best_layouts)
+
+    for layout in best_layouts:
+        print(layout)
 
 
 def iqm_qubit_selection() -> None:
