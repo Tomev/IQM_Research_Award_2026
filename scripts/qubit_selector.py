@@ -70,10 +70,12 @@ class IQMStarCostEvaluator:
         """TODO(TR): Docstring"""
 
         if not backend.has_resonators():
-            raise ValueError(f"Expected a backend with a central resonator. Got {backend}.")
+            raise ValueError(f"Expected a backend with a central resonator. Got {backend.name}.")
 
         self.backend: IQMBackend = backend
         self.circuit: QuantumCircuit = circuit
+        self.operation_errors: dict[str, float] = get_operation_errors(backend.name)
+        print(self.operation_errors)
 
     def _compile_circuit_for_layout(self, layout: list[int]) -> QuantumCircuit:
         """TODO(TR): Docstring"""
@@ -90,6 +92,26 @@ class IQMStarCostEvaluator:
 
         return compiled_qc
 
+    def _compute_circuit_cost(self, circuit: QuantumCircuit) -> float:
+        """TODO(TR): Docstring"""
+        circuit_cost: float = 0
+
+        for instruction in circuit.data:
+            errors_dict_key: str = instruction[0].name
+
+            if errors_dict_key == "r":
+                errors_dict_key = "prx"  # prx gate in IQM is r gate in qiskit
+
+            for component in instruction[1]:
+                bit_location = circuit.find_bit(component)
+                errors_dict_key += f"_{self.backend.index_to_qubit_name(bit_location.index)}_"
+
+            errors_dict_key = errors_dict_key[:-1]  # Remove last "_"
+
+            circuit_cost += self.operation_errors[errors_dict_key]
+
+        return circuit_cost
+
     def get_top_layouts(self, n_layouts: int) -> list[list[int]]:
         """TODO(TR): Docstring"""
         layouts: list[list[int]] = []
@@ -102,13 +124,12 @@ class IQMStarCostEvaluator:
         initial_layouts = list(permutations(qubit_indices, n_qubits))
         print(len(list(initial_layouts)))
 
-        compiled_qc: QuantumCircuit = self._compile_circuit_for_layout(initial_layouts[-1])
-        # print(compiled_qc)
-        for instruction in compiled_qc.data:
-            print(instruction)
+        initial_layouts = initial_layouts[:1]
 
-        operation_errors = get_operation_errors(self.backend.name)
-        print(operation_errors)
+        for layout in initial_layouts:
+            compiled_qc: QuantumCircuit = self._compile_circuit_for_layout(layout)
+            circuit_cost = self._compute_circuit_cost(compiled_qc)
+            print(circuit_cost)
 
         return layouts
 
