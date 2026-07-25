@@ -5,15 +5,58 @@
 """
 
 import os
+from collections import defaultdict
 from itertools import combinations, permutations
 
+from iqm.iqm_client import IQMClient
 from iqm.qiskit_iqm import IQMBackend, IQMProvider, transpile_to_IQM
 from iqm.qubit_selector.qubit_selector import CostEvaluator
+from iqm.station_control.interface.models import ObservationSetWithObservations
 from qiskit import transpile
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from tqdm import tqdm
 
 from src.jobs import LGACZ2
+
+
+def get_operation_errors(system_name: str) -> dict[str, float]:
+    """TODO(TR): Docstring
+
+    errors are (1 - fidelity)
+    """
+    client: IQMClient = IQMClient(
+        iqm_server_url=os.environ["IQM_PROVIDER"],
+        quantum_computer=system_name,
+    )
+
+    provider: IQMProvider = IQMProvider(
+        os.environ["IQM_PROVIDER"],
+        quantum_computer=system_name,
+    )
+    backend: IQMBackend = provider.get_backend()
+
+    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
+    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
+        calibration_set.observation_set_id
+    )
+
+    operation_errors: dict[str, float] = {}
+
+    for observation in quality_metric_set.observations:
+        if "tgss" in observation.dut_field or "qndness" in observation.dut_field:
+            continue
+
+        if ".fidelity" in observation.dut_field:
+            operation_name: str = observation.dut_field.split(".")[2]
+
+            if operation_name not in ["prx", "measure", "move", "cz"]:
+                continue
+            operation_target = observation.dut_field.split(".")[-2]
+            # print(observation.dut_field)
+
+            operation_errors[f"{operation_name}_{operation_target}"] = 1 - observation.value
+
+    return operation_errors
 
 
 class IQMStarCostEvaluator:
@@ -59,9 +102,13 @@ class IQMStarCostEvaluator:
         initial_layouts = list(permutations(qubit_indices, n_qubits))
         print(len(list(initial_layouts)))
 
-        for i in range(1, 3):
-            compiled_qc: QuantumCircuit = self._compile_circuit_for_layout(initial_layouts[-i])
-            print(compiled_qc)
+        compiled_qc: QuantumCircuit = self._compile_circuit_for_layout(initial_layouts[-1])
+        # print(compiled_qc)
+        for instruction in compiled_qc.data:
+            print(instruction)
+
+        operation_errors = get_operation_errors(self.backend.name)
+        print(operation_errors)
 
         return layouts
 
@@ -140,11 +187,10 @@ def main() -> None:
     provider: IQMProvider = IQMProvider(
         os.environ["IQM_PROVIDER"],
         quantum_computer=os.environ["IQM_COMPUTER"],
-        # quantum_computer="garnet",
     )
     backend: IQMBackend = provider.get_backend()
 
-    n_best_layouts: int = 3
+    n_best_layouts: int = 10
     circuit: QuantumCircuit = get_circuit()
 
     cost_evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
