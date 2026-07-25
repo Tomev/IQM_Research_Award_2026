@@ -2,6 +2,10 @@
 
 About ...
 
+## Technical summary
+
+- **FakeBackend**. In order to simulate `FakeSirius`, we prepared the `simulator` module of the project. Within it, we implemented not only the `FakeSirius` method, which creates the `sirius` computer simulator from the calibration and performance quality data. However, the module also contains functionalities that allows for creation of general IQM backend simulator from a real device, via `FakeFromBackend` method. The module is fully documented.
+
 ## Setup
 
 Prepare the environemnt with:

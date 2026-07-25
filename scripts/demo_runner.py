@@ -8,6 +8,7 @@ from iqm.qiskit_iqm import IQMFakeDeneb
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from src.jobs import LGACZ2, Job
+from src.simulator import FakeSirius
 
 # TODO(TR): Refactor those settings.
 N_JOBS: int = 4
@@ -35,10 +36,13 @@ def run_scripts():
     i: int = 0
     job_list_path = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
 
+    # backend = IQMFakeDeneb()
+    print(f"{datetime.now()}: Preparing FakeSirius")
+    backend = FakeSirius()
+
     while i < N_JOBS:
         print(f"{datetime.now()}: Starting service")
 
-        backend = IQMFakeDeneb()
         print(f"{datetime.now()}: pass manager")
         pm = generate_preset_pass_manager(backend=backend, optimization_level=0)
 

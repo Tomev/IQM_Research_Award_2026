@@ -14,3 +14,7 @@ project-includes = [
     "**/*.py*",
     "**/*.ipynb",
 ]
+
+
+[tool.ruff]
+line-length = 120
