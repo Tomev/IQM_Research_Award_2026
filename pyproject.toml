@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "iqm-client[qiskit]>=35.0.0",
+    "iqm-qubit-selector>=1.1.0",
     "matplotlib>=3.11.1",
 ]
 
