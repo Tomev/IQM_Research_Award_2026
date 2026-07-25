@@ -5,13 +5,65 @@
 """
 
 import os
-from itertools import combinations
+from itertools import combinations, permutations
 
-from iqm.qiskit_iqm import IQMBackend, IQMProvider
+from iqm.qiskit_iqm import IQMBackend, IQMProvider, transpile_to_IQM
 from iqm.qubit_selector.qubit_selector import CostEvaluator
+from qiskit import transpile
+from qiskit.circuit.quantumcircuit import QuantumCircuit
 from tqdm import tqdm
 
 from src.jobs import LGACZ2
+
+
+class IQMStarCostEvaluator:
+    """TODO(TR): Docstring this
+
+    .. note::
+        This is a simplistic version of the cost evaluator.
+    """
+
+    def __init__(self, backend: IQMBackend, circuit: QuantumCircuit) -> None:
+        """TODO(TR): Docstring"""
+
+        if not backend.has_resonators():
+            raise ValueError(f"Expected a backend with a central resonator. Got {backend}.")
+
+        self.backend: IQMBackend = backend
+        self.circuit: QuantumCircuit = circuit
+
+    def _compile_circuit_for_layout(self, layout: list[int]) -> QuantumCircuit:
+        """TODO(TR): Docstring"""
+        # Adds correct virtual->physical qubit mapping
+        compiled_qc = transpile_to_IQM(
+            self.circuit,
+            backend=self.backend,
+            initial_layout=layout,
+            perform_move_routing=False,
+        )
+
+        # Adds move gates
+        compiled_qc = transpile(compiled_qc, backend=self.backend)
+
+        return compiled_qc
+
+    def get_top_layouts(self, n_layouts: int) -> list[list[int]]:
+        """TODO(TR): Docstring"""
+        layouts: list[list[int]] = []
+
+        n_qubits: int = self.circuit.num_qubits
+        qubit_indices: list[int] = list(range(self.backend.num_qubits))
+        # This is star topology, so each qubit is connected with each other qubit via the central resonator. We can
+        # use that fact for the initial selection of the layouts.
+        # Remember that order DOES matter, as qubits have different responsibilities and undergo different evolutions.
+        initial_layouts = list(permutations(qubit_indices, n_qubits))
+        print(len(list(initial_layouts)))
+
+        for i in range(1, 3):
+            compiled_qc: QuantumCircuit = self._compile_circuit_for_layout(initial_layouts[-i])
+            print(compiled_qc)
+
+        return layouts
 
 
 def find_lgi_triplets(backend: IQMBackend) -> list[dict[str, int]]:
@@ -75,8 +127,16 @@ def find_qubit_connections(backend: IQMBackend, qubit: int) -> list[int]:
     return [con[1] for con in coupling_map if con[0] == qubit]
 
 
+def get_circuit() -> QuantumCircuit:
+    """TODO(TR): Docstring"""
+    qubits_list: list[list[int]] = [[1, 0, 2]]
+    job: LGACZ2 = LGACZ2()
+    job.n_repetitions = 1
+    job.add_test_circuits(qubits_list, 0.1)
+    return job.circuits[0]  # Do not transpile it, because it causes problems with "move" gate later!
+
+
 def main() -> None:
-    """
     provider: IQMProvider = IQMProvider(
         os.environ["IQM_PROVIDER"],
         quantum_computer=os.environ["IQM_COMPUTER"],
@@ -84,21 +144,13 @@ def main() -> None:
     )
     backend: IQMBackend = provider.get_backend()
 
-    triplets: list[dict[str, int]] = find_lgi_triplets(backend)
-    for triplet in triplets:
-        print(triplet)
-    print(f"# triplets: {len(triplets)}")
+    n_best_layouts: int = 3
+    circuit: QuantumCircuit = get_circuit()
 
+    cost_evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
 
-    fidelities = CalibrationDataManager().get_calibration_fidelities(backend)
-
-    for k, v in fidelities.items():
-        print(f"\n\n{k}: {v}")
-
-    # print(fidelities)
-    """
-
-    iqm_qubit_selection()
+    best_layouts: list[list[int]] = cost_evaluator.get_top_layouts(n_best_layouts)
+    print(best_layouts)
 
 
 def iqm_qubit_selection() -> None:
@@ -116,13 +168,7 @@ def iqm_qubit_selection() -> None:
     backend: IQMBackend = provider.get_backend()
 
     n_best_layouts: int = 3
-
-    qubits_list: list[list[int]] = [[1, 0, 2]]
-    job: LGACZ2 = LGACZ2()
-    job.n_repetitions = 1
-    job.add_test_circuits(qubits_list, 0.1)
-
-    circuit = job.circuits[0]  # Do not transpile it, because it causes problems with "move" gate later!
+    circuit: QuantumCircuit = get_circuit()
 
     layouts, cost = CostEvaluator(backend=backend, quantum_circuit=circuit).get_top_layouts(num_layouts=n_best_layouts)
     print(f"Top {n_best_layouts} qiskit layouts and their costs:")
