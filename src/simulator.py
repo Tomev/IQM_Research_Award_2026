@@ -9,6 +9,7 @@ system.
 
 import os
 from collections import defaultdict
+from datetime import datetime
 from typing import Literal
 
 from iqm.iqm_client import IQMClient, StaticQuantumArchitecture
@@ -81,7 +82,7 @@ def get_coupling_map(backend: IQMBackend) -> list[tuple[str, str]]:
     return coupling_map
 
 
-def get_error_profile(system_name: str) -> IQMErrorProfile:
+def get_error_profile(system_name: str, save_calibration: bool) -> IQMErrorProfile:
     """Returns the error profile for the given system.
 
     This function retrieves the error profile parameters, from the IQM server using the specified system name. It
@@ -90,25 +91,20 @@ def get_error_profile(system_name: str) -> IQMErrorProfile:
 
     Args:
         system_name: The name of the quantum system for which the error profile is to be retrieved.
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
 
     Returns:
         IQMErrorProfile: The error profile for the given system.
     """
-    client: IQMClient = IQMClient(
-        iqm_server_url=os.environ["IQM_PROVIDER"],
-        quantum_computer=system_name,
-    )
+    calibration_set: ObservationSetWithObservations
+    quality_metric_set: ObservationSetWithObservations
 
-    provider: IQMProvider = IQMProvider(
+    calibration_set, quality_metric_set = get_calibration_data(system_name, save_calibration)
+
+    backend: IQMBackend = IQMProvider(
         os.environ["IQM_PROVIDER"],
         quantum_computer=system_name,
-    )
-    backend: IQMBackend = provider.get_backend()
-
-    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
-    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
-        calibration_set.observation_set_id
-    )
+    ).get_backend()
 
     backend_gates: dict[str, list[str]] = get_gates(backend)
 
@@ -127,6 +123,44 @@ def get_error_profile(system_name: str) -> IQMErrorProfile:
         two_qubit_gate_durations=get_gates_duration(calibration_set, backend_gates["2q"]),
         readout_errors=get_readout_errors(quality_metric_set),
     )
+
+
+def get_calibration_data(
+    system_name: str, save_calibration: bool
+) -> tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
+    """Retrieves calibration and quality metric data for the specified system.
+
+    This function connects to the IQM server and retrieves the calibration set and quality metric set for the specified
+    quantum system. If `save_calibration` is set to True, the data is saved in JSON format with timestamps to
+    ensure unique filenames.
+
+    Args:
+        system_name: The name of the quantum system for which data is to be retrieved.
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+
+    Returns:
+        tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
+            A tuple containing the calibration set and quality metric set for the system.
+    """
+    client: IQMClient = IQMClient(
+        iqm_server_url=os.environ["IQM_PROVIDER"],
+        quantum_computer=system_name,
+    )
+
+    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
+    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
+        calibration_set.observation_set_id
+    )
+
+    if save_calibration:
+        now: str = str(datetime.now())
+        with open(f"{now}_{system_name}_calibration.json", "w") as f:
+            f.write(calibration_set.model_dump_json())
+
+        with open(f"{now}_{system_name}_quality.json", "w") as f:
+            f.write(quality_metric_set.model_dump_json())
+
+    return calibration_set, quality_metric_set
 
 
 def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeType) -> dict[str, float]:
@@ -151,7 +185,6 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
         if time_type in observation.dut_field:
             component_name: str = observation.dut_field.split(".")[-2]
             ts[component_name] = observation.value * 1e9  # seconds to nano seconds
-            print(f"{observation.dut_field}: {observation.value * 1e9}")
 
     return ts
 
@@ -325,7 +358,7 @@ def get_readout_errors(
     return readout_errors
 
 
-def FakeFromBackend(system_name: str) -> IQMFakeBackend:
+def FakeFromBackend(system_name: str, save_calibration: bool = False) -> IQMFakeBackend:
     """Creates a fake IQM backend simulator for the specified system.
 
     This function constructs an :class:`IQMFakeBackend` object using the static quantum architecture and error profile
@@ -334,6 +367,7 @@ def FakeFromBackend(system_name: str) -> IQMFakeBackend:
 
     Args:
         system_name: The name of the quantum system for which the fake backend is to be created.
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
 
     Returns:
         IQMFakeBackend: A fake backend simulator for the specified system.
@@ -341,19 +375,22 @@ def FakeFromBackend(system_name: str) -> IQMFakeBackend:
 
     return IQMFakeBackend(
         get_architecture(system_name),
-        get_error_profile(system_name),
+        get_error_profile(system_name, save_calibration),
         name=f"Fake{system_name.capitalize()}",
     )
 
 
-def FakeSirius() -> IQMFakeBackend:
+def FakeSirius(save_calibration: bool = False) -> IQMFakeBackend:
     """Creates a fake IQM backend simulator for the Sirius quantum system.
 
     This function constructs an :class:`IQMFakeBackend` object using the static quantum architecture and error profile
     specific to the `sirius` system. The resulting backend can be used for simulations that mimic the behavior of the
     real IQM `sirius` quantum computer.
 
+    Args:
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+
     Returns:
         IQMFakeBackend: A fake backend simulator for the `sirius` system.
     """
-    return FakeFromBackend("sirius")
+    return FakeFromBackend("sirius", save_calibration)
