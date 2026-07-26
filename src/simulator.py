@@ -20,7 +20,7 @@ from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import (
 from iqm.station_control.interface.models import ObservationSetWithObservations
 from numpy import average
 
-TimeType = Literal["t1", "t2"]
+TimeType = Literal["t1_time", "t2_time"]
 
 
 def get_architecture(system_name: str) -> StaticQuantumArchitecture:
@@ -112,9 +112,11 @@ def get_error_profile(system_name: str) -> IQMErrorProfile:
 
     backend_gates: dict[str, list[str]] = get_gates(backend)
 
+    t1: dict[str, float] = get_ts(quality_metric_set, "t1_time")
+
     return IQMErrorProfile(
-        t1s=get_ts(quality_metric_set, "t1"),
-        t2s=get_ts(quality_metric_set, "t2"),
+        t1s=t1,
+        t2s=ensure_t2_correct(t1, get_ts(quality_metric_set, "t2_time")),
         single_qubit_gate_depolarizing_error_parameters=compute_single_qubit_gates_depolarizing_error_parameters(
             quality_metric_set, backend_gates["1q"]
         ),
@@ -138,7 +140,7 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
         quality_metric_set:
             The set of observations containing quality metrics.
         time_type:
-            The type of time to extract, either "t1" or "t2".
+            The type of time to extract, either "t1_time" or "t2_time".
 
     Returns:
         dict[str, float]: A dictionary mapping component names to their corresponding T1 or T2 times in nanoseconds.
@@ -149,8 +151,25 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
         if time_type in observation.dut_field:
             component_name: str = observation.dut_field.split(".")[-2]
             ts[component_name] = observation.value * 1e9  # seconds to nano seconds
+            print(f"{observation.dut_field}: {observation.value * 1e9}")
 
     return ts
+
+
+def ensure_t2_correct(t1: dict[str, float], t2: dict[str, float]) -> dict[str, float]:
+    """TODO(TR): Docstring
+
+    In some of the calibration data, we got:
+
+    qiskit_aer.noise.noiseerror.NoiseError: 'Invalid T_2 relaxation time parameter: T_2 greater than 2 * T_1.'
+
+    which made it impossible for us to create fake devices. In order not to halt the experiments for that reason, we
+    will ensure T2 times are within those bounds.
+    """
+    for k in t2.keys():
+        t2[k] = min(t2[k], 2 * t1[k])
+
+    return t2
 
 
 def get_gates(backend: IQMBackend) -> dict[str, list[str]]:
