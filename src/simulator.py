@@ -157,14 +157,21 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
 
 
 def ensure_t2_correct(t1: dict[str, float], t2: dict[str, float]) -> dict[str, float]:
-    """TODO(TR): Docstring
+    """Ensures T2 times are within valid bounds relative to T1 times.
 
-    In some of the calibration data, we got:
+    In some of the calibration data, we encountered:
 
     qiskit_aer.noise.noiseerror.NoiseError: 'Invalid T_2 relaxation time parameter: T_2 greater than 2 * T_1.'
 
-    which made it impossible for us to create fake devices. In order not to halt the experiments for that reason, we
-    will ensure T2 times are within those bounds.
+    which made it impossible to create fake devices. To prevent this from halting experiments, this function ensures
+    that T2 times do not exceed twice the corresponding T1 times for each component.
+
+    Args:
+        t1: A dictionary mapping component names to their T1 times in nanoseconds.
+        t2: A dictionary mapping component names to their T2 times in nanoseconds.
+
+    Returns:
+        dict[str, float]: A dictionary with T2 times adjusted to be no greater than 2 * T1 for each component.
     """
     for k in t2.keys():
         t2[k] = min(t2[k], 2 * t1[k])
