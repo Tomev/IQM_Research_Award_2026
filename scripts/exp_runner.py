@@ -8,7 +8,6 @@ from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMFakeBackend
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
 
-from scripts.demo_runner import N_JOBS, N_REPETITIONS
 from src.jobs import LGACZ2, Job
 from src.simulator import FakeSirius
 
@@ -92,7 +91,7 @@ def noiseless_pipeline() -> None:
     """TODO(TR): Docstring"""
 
     print(f"{datetime.now()}: Preparing backend...")
-    backend: AerSimulator = AerSimulator()
+    backend: Backend = AerSimulator()
     print(f"{datetime.now()}: Preparing jobs...")
     # For noiseless simulations we only need one set of qubits.
     jobs: list[Job] = prepare_jobs(qubits_lists=[[1, 0, 2]])
@@ -102,19 +101,20 @@ def noiseless_pipeline() -> None:
     wait_and_save_results(jobs, zip_file_name="iqm_lg_noiseless_results")
 
 
-def noisy_pipeline() -> None:
+def noisy_pipeline(find_best_qubits: bool = False) -> None:
     """TODO(TR): Docstring"""
 
     print(f"{datetime.now()}: Preparing backend...")
-    backend: AerSimulator = FakeSirius()
+    backend: Backend = FakeSirius()
     print(f"{datetime.now()}: Selecting best qubits list...")
+    # TODO(TR): Add best qubits selection
     qubits_lists: list[list[int] | tuple[int, ...]] = [[1, 0, 2], [3, 4, 5]]
     print(f"{datetime.now()}: Preparing jobs...")
     jobs: list[Job] = prepare_jobs(qubits_lists)
     print(f"{datetime.now()}: Running jobs...")
     run_jobs(jobs, backend)
     print(f"{datetime.now()}: Waiting and saving results...")
-    wait_and_save_results(jobs, zip_file_name="iqm_lg_noisy_results")
+    wait_and_save_results(jobs, zip_file_name=f"iqm_lg_noisy_{backend.name}_results")
 
 
 def main():
