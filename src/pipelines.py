@@ -10,20 +10,19 @@ particularly for testing and benchmarking quantum algorithms and hardware."""
 
 import ast
 import json
-import os
 import time
 from datetime import datetime
 
 import pandas as pd
 from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
-from iqm.qiskit_iqm.iqm_provider import IQMBackend, IQMProvider
+from iqm.qiskit_iqm.iqm_provider import IQMBackend
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit_aer import AerSimulator
 
 from src.jobs import LGACZ2, Job
 from src.selector import IQMStarCostEvaluator
 from src.simulator import FakeSirius
-from src.utils import star_device_transpile
+from src.utils import get_backend, star_device_transpile
 
 # TODO(TR): Refactor those settings.
 # There are 8 angles per layout in the job. This means the number of circuits in a single job is equal to
@@ -239,23 +238,6 @@ def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
         for job in jobs:
             if job.last_status not in ["ERROR", "CANCELLED", "DONE"]:
                 results_ready = False
-
-
-def get_backend() -> IQMBackend:
-    """
-    Get the quantum backend from the IQM provider.
-
-    Returns:
-        An instance of :class:`IQMBackendBase` representing the quantum backend.
-
-    Raises:
-        EnvironmentError: If the required environment variables (`IQM_PROVIDER` or `IQM_COMPUTER`)
-                          are not set.
-    """
-    return IQMProvider(
-        os.environ["IQM_PROVIDER"],
-        quantum_computer=os.environ["IQM_COMPUTER"],
-    ).get_backend()
 
 
 def save_calibration() -> None:
