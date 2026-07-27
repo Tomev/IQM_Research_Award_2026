@@ -31,9 +31,11 @@ from src.utils import star_device_transpile
 #
 # Prefered setup is N_REPETITONS = 10, meaning that we can only handle 1 qubit layout per job. That is because maximal
 # number of circuits per job is 100 (on IQM Sirius).
+#
+
 N_JOBS_PER_LAYOUT: int = 10
 N_REPETITIONS: int = 10
-N_SHOTS: int = int(10e4)
+N_SHOTS: int = int(1e4)  # Max number of shots per circuit on IQM Sirius is 20000 (2e4).
 
 ### Test setup
 # N_JOBS_PER_LAYOUT: int = 1
