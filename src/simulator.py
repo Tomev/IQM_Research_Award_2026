@@ -153,7 +153,7 @@ def get_calibration_data(
     )
 
     if save_calibration:
-        now: str = str(datetime.now())
+        now: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         with open(f"{now}_{system_name}_calibration.json", "w") as f:
             f.write(calibration_set.model_dump_json())
 
@@ -376,7 +376,8 @@ def FakeFromBackend(system_name: str, save_calibration: bool = False) -> IQMFake
     return IQMFakeBackend(
         get_architecture(system_name),
         get_error_profile(system_name, save_calibration),
-        name=f"Fake{system_name.capitalize()}",
+        # name=f"Fake{system_name.capitalize()}",
+        name=system_name,  # Keep the original name, so that we can use this FakeBackend in IQMStarCostEvaluator
     )
 
 
