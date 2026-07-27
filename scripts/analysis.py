@@ -58,7 +58,7 @@ def main():
     summed_result = LGResult(pd.DataFrame())
     results_path = "results"
     for i in range(N_JOBS):
-        pd_result = pd.read_csv(f"{DATA_FOLDER}\\results_tests_{i}.csv")
+        pd_result = pd.read_csv(f"{DATA_FOLDER}/results_tests_{i}.csv")
 
         summed_result.AppendResults(pd_result)
 
