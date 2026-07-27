@@ -6,13 +6,48 @@ import pandas as pd
 from src.pipelines import get_layouts_from_layouts_info
 
 # Settings
-N_JOBS_PER_LAYOUT: int = 10
+N_JOBS_PER_LAYOUT: int = 5
 N_STEERIING_BITS: int = 8
 
 STATES_ORDER = ["000", "100", "010", "110", "001", "101", "011", "111"]
+COLUMNS: list[str] = [
+    "qubits",
+    "LGBA",
+    "LGeBA",
+    "LGAB",
+    "LGeAB",
+    "ABC",
+    "eABC",
+    "BAC",
+    "eBAC",
+    "AbC",
+    "eAbC",
+    "bAC",
+    "ebAC",
+    "BaC",
+    "eBaC",
+    "aBC",
+    "eaBC",
+    "abC",
+    "eabC",
+    "baC",
+    "ebaC",
+    "AB",
+    "eAB",
+    "BA",
+    "eBA",
+    "Ab",
+    "eAb",
+    "bA",
+    "ebA",
+    "Ba",
+    "eBa",
+    "aB",
+    "eaB",
+]
 
 
-LAYOUTS = get_layouts_from_layouts_info("./data/2026-07-27_203226_layouts_info.json")
+LAYOUTS = get_layouts_from_layouts_info("./data/noisy_1e4_shots/2026-07-27_203226_layouts_info.json")
 DATA_FOLDER: str = os.environ["EXP_DATA_PATH"]
 
 
@@ -47,13 +82,15 @@ class LGResult:
 
 def main():
 
+    aggregated_df: pd.DataFrame = pd.DataFrame(columns=COLUMNS)
+
     for layout_index in range(len(LAYOUTS)):
         print(layout_index)
 
         summed_result = LGResult(pd.DataFrame())
 
         for i in range(N_JOBS_PER_LAYOUT):
-            pd_result = pd.read_csv(f"{DATA_FOLDER}/results_tests_{i + len(LAYOUTS) * layout_index}.csv")
+            pd_result = pd.read_csv(f"{DATA_FOLDER}/results_tests_{i + N_JOBS_PER_LAYOUT * layout_index}.csv")
 
             summed_result.AppendResults(pd_result)
 
@@ -317,42 +354,9 @@ def main():
         er_Ba.append(sqrt(eBa / n_shots) / (4 * weak_meas_rotation_angle))
 
         indices = range(len(inequality_values_AB))
+
         df = pd.DataFrame(
-            columns=[
-                "qubits",
-                "LGBA",
-                "LGeBA",
-                "LGAB",
-                "LGeAB",
-                "ABC",
-                "eABC",
-                "BAC",
-                "eBAC",
-                "AbC",
-                "eAbC",
-                "bAC",
-                "ebAC",
-                "BaC",
-                "eBaC",
-                "aBC",
-                "eaBC",
-                "abC",
-                "eabC",
-                "baC",
-                "ebaC",
-                "AB",
-                "eAB",
-                "BA",
-                "eBA",
-                "Ab",
-                "eAb",
-                "bA",
-                "ebA",
-                "Ba",
-                "eBa",
-                "aB",
-                "eaB",
-            ],
+            columns=COLUMNS,
             index=indices,
         )
 
@@ -391,7 +395,10 @@ def main():
             df.loc[i, "Ab"] = val_Ab[i]
             df.loc[i, "eAb"] = er_Ab[i]
 
+        aggregated_df = pd.concat([aggregated_df, df], axis=0)
         df.to_csv(f"{DATA_FOLDER}/lg_results_summary_layout_{LAYOUTS[layout_index]}.csv")
+
+    aggregated_df.to_csv(f"{DATA_FOLDER}/lg_results_aggregated_summary.csv")
 
 
 if __name__ == "__main__":

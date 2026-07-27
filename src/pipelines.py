@@ -33,9 +33,9 @@ from src.utils import star_device_transpile
 # number of circuits per job is 100 (on IQM Sirius).
 #
 
-N_JOBS_PER_LAYOUT: int = 10
+N_JOBS_PER_LAYOUT: int = 5
 N_REPETITIONS: int = 10
-N_SHOTS: int = int(1e4)  # Max number of shots per circuit on IQM Sirius is 20000 (2e4).
+N_SHOTS: int = int(2e4)  # Max number of shots per circuit on IQM Sirius is 20000 (2e4).
 
 ### Test setup
 # N_JOBS_PER_LAYOUT: int = 1
