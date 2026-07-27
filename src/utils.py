@@ -2,6 +2,7 @@
 Utility module for handling general-purpose handling of quantum devices and circuits.
 """
 
+import ast
 import os
 from datetime import datetime
 
@@ -76,7 +77,7 @@ def gather_jobs(jobs_summary_path: str) -> None:
     print(f"{datetime.now()}: Getting backend...")
     backend: IQMBackend = get_backend()
     print(f"{datetime.now()}: Downloading jobs...")
-    jobs: list[LGACZ2] = download_jobs(extract_job_ids(jobs_summary_path), backend)
+    jobs: list[LGACZ2] = download_jobs(extract_job_summaries(jobs_summary_path), backend)
     zip_file_name: str = f"{NOW}_iqm_lg_real_{backend.name}_results"
 
     print(f"{datetime.now()}: Saving jobs...")
@@ -86,19 +87,20 @@ def gather_jobs(jobs_summary_path: str) -> None:
         job.save_to_file(file_name, f"{RESULTS_FOLDER_NAME}/{zip_file_name}")
 
 
-def extract_job_ids(jobs_summary_path: str) -> list[str]:
-    """Extracts job IDs from a summary file.
+def extract_job_summaries(jobs_summary_path: str) -> list[tuple[str, list[list[int]]]]:
+    """Extracts job IDs and their corresponding steering bits order from a LG jobs summary file.
 
-    Parses a CSV file containing job summaries and extracts the job IDs.
+    Reads a CSV file containing job metadata, specifically extracting job IDs and the steering bits order associated
+    with each job. The steering bits orders are stored as nested lists of integers.
 
     Args:
-        jobs_summary_path: The file path to the CSV summary file containing job information.
+        jobs_summary_path: The file path to the CSV summary file containing job IDs and other metadata.
 
     Returns:
-        A list of strings, where each string is a job ID extracted from the summary file.
+        A list of tuples, where each tuple contains a job ID (str) and steering bit order for the job (list[list[int]]).
     """
     print(f"{datetime.now()}: Extracting job ids...")
-    job_ids: list[str] = []
+    job_summaries: list[tuple[str, list[list[int]]]] = []
 
     print(f"{datetime.now()}: Got...")
     with open(jobs_summary_path, "r") as f:
@@ -106,14 +108,14 @@ def extract_job_ids(jobs_summary_path: str) -> list[str]:
         line: str = f.readline()
 
         while line:
-            job_ids.append(line.split(",")[1])
-            print(f"\t{job_ids[-1]}")
+            job_summaries.append((line.split(",")[1], ast.literal_eval(line.split('"')[1])))
+            print(f"\t{job_summaries[-1][0]}")
             line = f.readline()
 
-    return job_ids
+    return job_summaries
 
 
-def download_jobs(job_ids: list[str], backend: IQMBackend) -> list[LGACZ2]:
+def download_jobs(job_summaries: list[tuple[str, list[list[int]]]], backend: IQMBackend) -> list[LGACZ2]:
     """Downloads the results of specified jobs from the quantum backend.
 
     Retrieves the job results for a list of job IDs and converts them into instances
@@ -129,11 +131,11 @@ def download_jobs(job_ids: list[str], backend: IQMBackend) -> list[LGACZ2]:
     jobs: list[LGACZ2] = []
 
     print(f"{datetime.now()}: Retrieved job...")
-    for job_id in job_ids:
-        print(f"\t{job_id}")
+    for job_summary in job_summaries:
         jobs.append(LGACZ2())
         jobs[-1].n_repetitions = N_REPETITIONS
         jobs[-1].add_test_circuits([[0, 1, 2]], 0.1)
-        jobs[-1].queued_job = backend.retrieve_job(job_id)
+        jobs[-1].indices_list = job_summary[1]
+        jobs[-1].queued_job = backend.retrieve_job(job_summary[0])
 
     return jobs
