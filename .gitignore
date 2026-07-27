@@ -1,3 +1,5 @@
 .zed/*
 data/*
 *__pycache__*
+*.json
+.DS_Store

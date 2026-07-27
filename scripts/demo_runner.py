@@ -4,7 +4,6 @@ import time
 from datetime import datetime
 
 import pandas as pd
-from iqm.qiskit_iqm import IQMFakeDeneb
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from src.jobs import LGACZ2, Job

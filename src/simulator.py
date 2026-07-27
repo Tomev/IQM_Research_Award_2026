@@ -9,6 +9,7 @@ system.
 
 import os
 from collections import defaultdict
+from datetime import datetime
 from typing import Literal
 
 from iqm.iqm_client import IQMClient, StaticQuantumArchitecture
@@ -20,7 +21,7 @@ from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import (
 from iqm.station_control.interface.models import ObservationSetWithObservations
 from numpy import average
 
-TimeType = Literal["t1", "t2"]
+TimeType = Literal["t1_time", "t2_time"]
 
 
 def get_architecture(system_name: str) -> StaticQuantumArchitecture:
@@ -36,11 +37,10 @@ def get_architecture(system_name: str) -> StaticQuantumArchitecture:
         StaticQuantumArchitecture: The static quantum architecture for the given system.
     """
 
-    provider: IQMProvider = IQMProvider(
+    backend: IQMBackend = IQMProvider(
         os.environ["IQM_PROVIDER"],
         quantum_computer=system_name,
-    )
-    backend: IQMBackend = provider.get_backend()
+    ).get_backend()
 
     return StaticQuantumArchitecture(
         dut_label=f"Fake{system_name.capitalize()}",
@@ -81,7 +81,7 @@ def get_coupling_map(backend: IQMBackend) -> list[tuple[str, str]]:
     return coupling_map
 
 
-def get_error_profile(system_name: str) -> IQMErrorProfile:
+def get_error_profile(system_name: str, save_calibration: bool) -> IQMErrorProfile:
     """Returns the error profile for the given system.
 
     This function retrieves the error profile parameters, from the IQM server using the specified system name. It
@@ -90,31 +90,28 @@ def get_error_profile(system_name: str) -> IQMErrorProfile:
 
     Args:
         system_name: The name of the quantum system for which the error profile is to be retrieved.
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
 
     Returns:
         IQMErrorProfile: The error profile for the given system.
     """
-    client: IQMClient = IQMClient(
-        iqm_server_url=os.environ["IQM_PROVIDER"],
-        quantum_computer=system_name,
-    )
+    calibration_set: ObservationSetWithObservations
+    quality_metric_set: ObservationSetWithObservations
 
-    provider: IQMProvider = IQMProvider(
+    calibration_set, quality_metric_set = get_calibration_data(system_name, save_calibration)
+
+    backend: IQMBackend = IQMProvider(
         os.environ["IQM_PROVIDER"],
         quantum_computer=system_name,
-    )
-    backend: IQMBackend = provider.get_backend()
-
-    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
-    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
-        calibration_set.observation_set_id
-    )
+    ).get_backend()
 
     backend_gates: dict[str, list[str]] = get_gates(backend)
 
+    t1: dict[str, float] = get_ts(quality_metric_set, "t1_time")
+
     return IQMErrorProfile(
-        t1s=get_ts(quality_metric_set, "t1"),
-        t2s=get_ts(quality_metric_set, "t2"),
+        t1s=t1,
+        t2s=ensure_t2_correct(t1, get_ts(quality_metric_set, "t2_time")),
         single_qubit_gate_depolarizing_error_parameters=compute_single_qubit_gates_depolarizing_error_parameters(
             quality_metric_set, backend_gates["1q"]
         ),
@@ -125,6 +122,44 @@ def get_error_profile(system_name: str) -> IQMErrorProfile:
         two_qubit_gate_durations=get_gates_duration(calibration_set, backend_gates["2q"]),
         readout_errors=get_readout_errors(quality_metric_set),
     )
+
+
+def get_calibration_data(
+    system_name: str, save_calibration: bool
+) -> tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
+    """Retrieves calibration and quality metric data for the specified system.
+
+    This function connects to the IQM server and retrieves the calibration set and quality metric set for the specified
+    quantum system. If `save_calibration` is set to True, the data is saved in JSON format with timestamps to
+    ensure unique filenames.
+
+    Args:
+        system_name: The name of the quantum system for which data is to be retrieved.
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+
+    Returns:
+        tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
+            A tuple containing the calibration set and quality metric set for the system.
+    """
+    client: IQMClient = IQMClient(
+        iqm_server_url=os.environ["IQM_PROVIDER"],
+        quantum_computer=system_name,
+    )
+
+    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
+    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
+        calibration_set.observation_set_id
+    )
+
+    if save_calibration:
+        now: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        with open(f"{now}_{system_name}_calibration.json", "w") as f:
+            f.write(calibration_set.model_dump_json())
+
+        with open(f"{now}_{system_name}_quality.json", "w") as f:
+            f.write(quality_metric_set.model_dump_json())
+
+    return calibration_set, quality_metric_set
 
 
 def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeType) -> dict[str, float]:
@@ -138,7 +173,7 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
         quality_metric_set:
             The set of observations containing quality metrics.
         time_type:
-            The type of time to extract, either "t1" or "t2".
+            The type of time to extract, either "t1_time" or "t2_time".
 
     Returns:
         dict[str, float]: A dictionary mapping component names to their corresponding T1 or T2 times in nanoseconds.
@@ -151,6 +186,29 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
             ts[component_name] = observation.value * 1e9  # seconds to nano seconds
 
     return ts
+
+
+def ensure_t2_correct(t1: dict[str, float], t2: dict[str, float]) -> dict[str, float]:
+    """Ensures T2 times are within valid bounds relative to T1 times.
+
+    In some of the calibration data, we encountered:
+
+    qiskit_aer.noise.noiseerror.NoiseError: 'Invalid T_2 relaxation time parameter: T_2 greater than 2 * T_1.'
+
+    which made it impossible to create fake devices. To prevent this from halting experiments, this function ensures
+    that T2 times do not exceed twice the corresponding T1 times for each component.
+
+    Args:
+        t1: A dictionary mapping component names to their T1 times in nanoseconds.
+        t2: A dictionary mapping component names to their T2 times in nanoseconds.
+
+    Returns:
+        dict[str, float]: A dictionary with T2 times adjusted to be no greater than 2 * T1 for each component.
+    """
+    for k in t2.keys():
+        t2[k] = min(t2[k], 2 * t1[k])
+
+    return t2
 
 
 def get_gates(backend: IQMBackend) -> dict[str, list[str]]:
@@ -299,7 +357,7 @@ def get_readout_errors(
     return readout_errors
 
 
-def FakeFromBackend(system_name: str) -> IQMFakeBackend:
+def FakeFromBackend(system_name: str, save_calibration: bool = False) -> IQMFakeBackend:
     """Creates a fake IQM backend simulator for the specified system.
 
     This function constructs an :class:`IQMFakeBackend` object using the static quantum architecture and error profile
@@ -308,6 +366,7 @@ def FakeFromBackend(system_name: str) -> IQMFakeBackend:
 
     Args:
         system_name: The name of the quantum system for which the fake backend is to be created.
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
 
     Returns:
         IQMFakeBackend: A fake backend simulator for the specified system.
@@ -315,19 +374,23 @@ def FakeFromBackend(system_name: str) -> IQMFakeBackend:
 
     return IQMFakeBackend(
         get_architecture(system_name),
-        get_error_profile(system_name),
-        name=f"Fake{system_name.capitalize()}",
+        get_error_profile(system_name, save_calibration),
+        # name=f"Fake{system_name.capitalize()}",
+        name=system_name,  # Keep the original name, so that we can use this FakeBackend in IQMStarCostEvaluator
     )
 
 
-def FakeSirius() -> IQMFakeBackend:
+def FakeSirius(save_calibration: bool = False) -> IQMFakeBackend:
     """Creates a fake IQM backend simulator for the Sirius quantum system.
 
     This function constructs an :class:`IQMFakeBackend` object using the static quantum architecture and error profile
     specific to the `sirius` system. The resulting backend can be used for simulations that mimic the behavior of the
     real IQM `sirius` quantum computer.
 
+    Args:
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+
     Returns:
         IQMFakeBackend: A fake backend simulator for the `sirius` system.
     """
-    return FakeFromBackend("sirius")
+    return FakeFromBackend("sirius", save_calibration)

@@ -15,11 +15,12 @@ import os
 from itertools import permutations
 
 from iqm.iqm_client import IQMClient
-from iqm.qiskit_iqm import IQMBackend, transpile_to_IQM
+from iqm.qiskit_iqm import IQMBackend
 from iqm.station_control.interface.models import ObservationSetWithObservations
-from qiskit import transpile
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from tqdm import tqdm
+
+from src.utils import star_device_transpile
 
 
 def get_operation_errors(system_name: str) -> dict[str, float]:
@@ -95,26 +96,6 @@ class IQMStarCostEvaluator:
         self.circuit: QuantumCircuit = circuit
         self.operation_errors: dict[str, float] = get_operation_errors(backend.name)
 
-    def _compile_circuit_for_layout(self, layout: list[int]) -> QuantumCircuit:
-        """Compiles the quantum circuit for a given qubit layout.
-
-        Two transpilation steps are required: first to apply the virtual-to-physical qubit mapping,
-        and second to add move gates necessary for the star topology device. Move gates need to be
-        present in order to compute errors more precisely.
-        """
-        # Step 1: Adds correct virtual->physical qubit mapping.
-        compiled_qc = transpile_to_IQM(
-            self.circuit,
-            backend=self.backend,
-            initial_layout=layout,
-            perform_move_routing=False,
-        )
-
-        # Step 2: Adds move gates.
-        compiled_qc = transpile(compiled_qc, backend=self.backend)
-
-        return compiled_qc
-
     def _compute_circuit_cost(self, circuit: QuantumCircuit) -> float:
         """Computes the total cost of a quantum circuit based on operation errors.
 
@@ -168,7 +149,7 @@ class IQMStarCostEvaluator:
         # use that fact for the initial selection of the layouts.
         # Remember that order DOES matter, as qubits have different responsibilities and undergo different evolutions.
         for layout in tqdm(permutations(qubit_indices, n_qubits)):
-            compiled_qc: QuantumCircuit = self._compile_circuit_for_layout(layout)
+            compiled_qc: QuantumCircuit = star_device_transpile(self.circuit, self.backend, layout)
             circuit_cost: float = self._compute_circuit_cost(compiled_qc)
             layouts.append((layout, circuit_cost))
 
