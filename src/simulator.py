@@ -37,11 +37,10 @@ def get_architecture(system_name: str) -> StaticQuantumArchitecture:
         StaticQuantumArchitecture: The static quantum architecture for the given system.
     """
 
-    provider: IQMProvider = IQMProvider(
+    backend: IQMBackend = IQMProvider(
         os.environ["IQM_PROVIDER"],
         quantum_computer=system_name,
-    )
-    backend: IQMBackend = provider.get_backend()
+    ).get_backend()
 
     return StaticQuantumArchitecture(
         dut_label=f"Fake{system_name.capitalize()}",
