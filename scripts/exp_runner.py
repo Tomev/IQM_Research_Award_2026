@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 
 import pandas as pd
+from IPython.utils import data
 from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit_aer import AerSimulator
@@ -36,7 +37,22 @@ Backend = AerSimulator | IQMFakeBackend
 
 
 def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> list[tuple[int, ...]]:
-    """TODO(TR): Docstring"""
+    """
+    Find the best qubit layouts for a given quantum circuit based on a cost evaluator.
+
+    Args:
+        backend: The quantum backend to use for evaluation.
+        n_layouts: The number of top layouts to return.
+
+    Returns:
+        A list of the best qubit layouts, each represented as a tuple of integers.
+
+    Raises:
+        ValueError: If the backend is not compatible with the evaluator.
+
+    See Also:
+        :class:`IQMStarCostEvaluator` for the cost evaluation logic.
+    """
 
     # Create a job for evaluator
     job: LGACZ2 = LGACZ2()
@@ -56,7 +72,11 @@ def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> lis
 
 def save_layouts_info(layouts: list[tuple[tuple[int, ...], float]]) -> None:
     """
-    TODO(TR): Docstrings
+    Save information about qubit layouts and their corresponding costs to a JSON file.
+
+    Args:
+        layouts: A list of tuples, where each tuple contains a qubit layout (as a tuple of integers)
+                 and its corresponding cost (as a float).
     """
     layouts_info_dict: dict[str, float] = {str(layout): cost for layout, cost in layouts}
 
@@ -66,7 +86,23 @@ def save_layouts_info(layouts: list[tuple[tuple[int, ...], float]]) -> None:
 
 
 def get_layouts_from_layouts_info(info_file_path: str) -> list[tuple[int, ...]]:
-    """TODO(TR): Docstring"""
+    """
+    Load qubit layouts from a JSON file containing layout information.
+
+    Args:
+        info_file_path: The path to the JSON file containing qubit layout data.
+
+    Returns:
+        A list of qubit layouts, each represented as a tuple of integers.
+
+    Raises:
+        FileNotFoundError: If the specified JSON file does not exist.
+        json.JSONDecodeError: If the JSON file is malformed.
+        ValueError: If the JSON file contains invalid layout data.
+
+    See Also:
+        :func:`save_layouts_info` for the corresponding function that saves layout information.
+    """
     try:
         with open(info_file_path, "r") as f:
             layouts: dict[str, float] = json.load(f)
@@ -80,9 +116,24 @@ def get_layouts_from_layouts_info(info_file_path: str) -> list[tuple[int, ...]]:
 
 
 def prepare_lg_jobs(qubits_lists: list[list[int] | tuple[int, ...]], backend: Backend) -> list[Job]:
-    """TODO(TR): Docstring"""
+    """
+    Prepare a list of jobs for execution on a quantum backend, adjusting the qubit layouts for each job.
+
+    Args:
+        qubits_lists:
+            A list of qubit layouts, where each layout is a list or tuple of integers representing qubit indices.
+        backend:
+            The quantum backend to use for execution, which can be either an `AerSimulator` or an `IQMFakeBackend`.
+
+    Returns:
+        A list of :class:`Job` instances, each containing quantum circuits adapted to the specified qubit layouts.
+
+    Notes:
+        For each qubit layout, multiple jobs are created based on the :data:`N_JOBS_PER_LAYOUT` setting.
+        If the backend is not an IQMBackendBase (e.g., is AerSimulator), transpilation is skipped.
+    """
     jobs: list[Job] = []
-    for qubits_list in qubits_lists:
+    for layout in qubits_lists:
         for _ in range(N_JOBS_PER_LAYOUT):
             job: LGACZ2 = LGACZ2()
             job.n_repetitions = N_REPETITIONS
@@ -91,16 +142,32 @@ def prepare_lg_jobs(qubits_lists: list[list[int] | tuple[int, ...]], backend: Ba
 
             # Transpile the circuits in the job, if needed
             if not issubclass(type(backend), IQMBackendBase):
+                print(f"{datetime.now()} Skipping circuits transpilation for backend {backend.name}.")
                 continue  # Skip noiseless sim.
 
             for i in range(len(jobs[-1].circuits)):
-                jobs[-1].circuits[i] = star_device_transpile(jobs[-1].circuits[i], backend, qubits_list)
+                jobs[-1].circuits[i] = star_device_transpile(jobs[-1].circuits[i], backend, layout)
 
     return jobs
 
 
 def run_jobs(jobs: list[Job], backend: Backend) -> None:
-    """TODO(TR): Docstring"""
+    """
+    Run a list of quantum jobs on the specified backend and save jobs summary to a CSV file.
+
+    Args:
+        jobs:
+            A list of :class:`Job` instances to be executed.
+        backend:
+            The quantum backend to use for execution, which can be either an AerSimulator or an IQMFakeBackend.
+
+    Notes:
+        For each job, the job ID and parameters are recorded in a DataFrame and saved to the CSV file
+        specified by :data:`RESULTS_FILE_NAME` in the :data:`RESULTS_FOLDER_NAME` directory.
+        If an error occurs during job submission, the error is printed and the code waits for a short
+        period before continuing. This is to prevent internet connection-related issues during the circuits
+        execution on a real hardware.
+    """
     job_list_path: str = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
     job_list_table: pd.DataFrame = pd.DataFrame()
 
@@ -121,7 +188,21 @@ def run_jobs(jobs: list[Job], backend: Backend) -> None:
 
 
 def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
-    """TODO(TR): Docstring"""
+    """
+    Wait for all jobs to complete and save their results to CSV files.
+
+    Args:
+        jobs:
+            A list of :class:`Job` instances whose results need to be saved.
+        zip_file_name:
+            The name of the ZIP file to which the results will be archived.
+
+    Notes:
+        This function continuously checks the status of each job. When a job is completed,
+        its results are saved to a CSV file. If a job fails or is cancelled, an error message
+        and relevant metrics are printed. The function waits for a short period before checking
+        the status again to avoid overwhelming the system.
+    """
 
     results_ready: bool = False
 
@@ -145,7 +226,18 @@ def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
 
 
 def noiseless_pipeline() -> None:
-    """TODO(TR): Docstring"""
+    """
+    Execute a noiseless simulation pipeline using a quantum simulator backend.
+
+    Notes:
+        This function prepares the jobs with a fixed set of qubits, runs them on a noiseless simulator backend,
+        and saves the results. The qubit layout used is [1, 0, 2], which is hardcoded for this specific pipeline.
+        The results are saved in the directory specified by :data:`RESULTS_FOLDER_NAME` with the filename
+        specified by :data:`RESULTS_FILE_NAME`.
+
+    See Also:
+        :func:`noisy_pipeline` for the corresponding function that runs noisy simulations.
+    """
 
     print(f"{datetime.now()}: Preparing backend...")
     backend: Backend = AerSimulator()
@@ -159,7 +251,23 @@ def noiseless_pipeline() -> None:
 
 
 def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
-    """TODO(TR): Docstring"""
+    """
+    Execute a noisy simulation pipeline using the specified qubit layouts on a fake quantum backend.
+
+    Args:
+        qubits_lists:
+            A list of qubit layouts, where each layout is a list or tuple of integers representing qubit indices.
+            If empty, the best layouts are automatically determined using :func:`find_best_qubit_layouts`.
+
+    Notes:
+        This function prepares the jobs with the specified qubit layouts, runs them on a fake noisy backend,
+        and saves the results. If no layouts are provided, the function first identifies the best layouts
+        based on the cost evaluator before proceeding with job execution.
+
+    See Also:
+        :func:`find_best_qubit_layouts` for automatic layout selection.
+        :func:`prepare_lg_jobs` for job preparation.
+    """
 
     print(f"{datetime.now()}: Preparing backend...")
     backend: IQMFakeBackend = FakeSirius(save_calibration=True)
@@ -175,11 +283,11 @@ def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
 
 
 def main():
-    print("Start")
+    print(f"{datetime.now()} Start")
     # noiseless_pipeline()
     qubits_lists: list[list[int] | tuple[int, ...]] = get_layouts_from_layouts_info("")
     noisy_pipeline(qubits_lists)
-    print("Done")
+    print(f"{datetime.now()} Done")
 
 
 if __name__ == "__main__":
