@@ -176,9 +176,7 @@ def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
 def main():
     print("Start")
     # noiseless_pipeline()
-    qubits_lists: list[list[int] | tuple[int, ...]] = get_layouts_from_layouts_info(
-        "data/2026-07-27_031107_layouts_info.json"
-    )
+    qubits_lists: list[list[int] | tuple[int, ...]] = get_layouts_from_layouts_info("")
     noisy_pipeline(qubits_lists)
     print("Done")
 
