@@ -4,12 +4,12 @@ import time
 from datetime import datetime
 
 import pandas as pd
-from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMFakeBackend
-from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
 from qiskit_aer import AerSimulator
 
 from src.jobs import LGACZ2, Job
 from src.simulator import FakeSirius
+from src.utils import star_device_transpile
 
 # TODO(TR): Refactor those settings.
 # N_JOBS: int = 10
@@ -27,15 +27,22 @@ ZIP_FILE_NAME: str = "iqm_lg_results"  # No extension.
 Backend = AerSimulator | IQMFakeBackend
 
 
-def prepare_jobs(qubits_lists: list[list[int] | tuple[int, ...]]) -> list[Job]:
+def prepare_lg_jobs(qubits_lists: list[list[int] | tuple[int, ...]], backend: Backend) -> list[Job]:
     """TODO(TR): Docstring"""
     jobs: list[Job] = []
     for qubits_list in qubits_lists:
         for _ in range(N_JOBS):
             job: LGACZ2 = LGACZ2()
             job.n_repetitions = N_REPETITIONS
-            job.add_test_circuits([qubits_list], 0.1)
+            job.add_test_circuits([[0, 1, 2]], 0.1)  # Qubits will be adjusted during transpilation.
             jobs.append(job)
+
+        if not issubclass(type(backend), IQMBackendBase):
+            continue  # Skip noiseless sim.
+
+        for i in range(len(jobs[-1].circuits)):
+            jobs[-1].circuits[i] = star_device_transpile(jobs[-1].circuits[i], backend, qubits_list)
+
     return jobs
 
 
@@ -94,7 +101,7 @@ def noiseless_pipeline() -> None:
     backend: Backend = AerSimulator()
     print(f"{datetime.now()}: Preparing jobs...")
     # For noiseless simulations we only need one set of qubits.
-    jobs: list[Job] = prepare_jobs(qubits_lists=[[1, 0, 2]])
+    jobs: list[Job] = prepare_lg_jobs(qubits_lists=[[1, 0, 2]], backend=backend)
     print(f"{datetime.now()}: Running jobs...")
     run_jobs(jobs, backend)
     print(f"{datetime.now()}: Waiting and saving results...")
@@ -110,7 +117,7 @@ def noisy_pipeline(find_best_qubits: bool = False) -> None:
     # TODO(TR): Add best qubits selection
     qubits_lists: list[list[int] | tuple[int, ...]] = [[1, 0, 2], [3, 4, 5]]
     print(f"{datetime.now()}: Preparing jobs...")
-    jobs: list[Job] = prepare_jobs(qubits_lists)
+    jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
     print(f"{datetime.now()}: Running jobs...")
     run_jobs(jobs, backend)
     print(f"{datetime.now()}: Waiting and saving results...")
