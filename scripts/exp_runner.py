@@ -18,12 +18,15 @@ from src.simulator import FakeSirius
 from src.utils import star_device_transpile
 
 # TODO(TR): Refactor those settings.
-# N_JOBS_PER_LAYOUT: int = 10
-# N_REPETITIONS: int = 10
-# N_SHOTS: int = int(10e4)
-N_JOBS_PER_LAYOUT: int = 1
-N_REPETITIONS = 1
-N_SHOTS: int = int(10e3)
+N_JOBS_PER_LAYOUT: int = 10
+N_REPETITIONS: int = 10
+N_SHOTS: int = int(10e4)
+
+### Test setup
+# N_JOBS_PER_LAYOUT: int = 1
+# N_REPETITIONS = 1
+# N_SHOTS: int = int(10e3)
+
 WAIT_TIME: int = 10  # TODO(TR): Adjust or remove.
 RESULTS_FOLDER_NAME: str = "./data"
 RESULTS_FILE_NAME: str = "job_list_lga_sim2zz.csv"
@@ -100,11 +103,11 @@ def run_jobs(jobs: list[Job], backend: Backend) -> None:
     job_list_path: str = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
     job_list_table: pd.DataFrame = pd.DataFrame()
 
-    for job in jobs:
+    for i, job in enumerate(jobs):
         try:
             job.queued_job = backend.run(job.circuits, shots=N_SHOTS)
 
-            print(f"{datetime.now()}: job queued")
+            print(f"{datetime.now()}: job {i + 1} (of {len(jobs)}) queued")
             job_data: dict = {
                 "job_id": job.queued_job.job_id(),
                 "pars": job.indices_list,
@@ -119,27 +122,25 @@ def run_jobs(jobs: list[Job], backend: Backend) -> None:
 def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
     """TODO(TR): Docstring"""
 
-    ndone: bool = True
+    results_ready: bool = False
 
-    while ndone:
-        ndone = False
+    while not results_ready:
+        results_ready = True
         time.sleep(WAIT_TIME)
 
         for i in range(len(jobs)):
             if jobs[i].update_status():
-                print(i, jobs[i].last_status)
+                print(i + 1, jobs[i].last_status)
                 if jobs[i].last_status == "DONE" and not jobs[i].if_saved:
-                    filename = f"{RESULTS_FOLDER_NAME}/results_tests_{str(i)}.csv"
-                    jobs[i].save_to_file(filename, f"{RESULTS_FOLDER_NAME}/{zip_file_name}")
-                    print(i, jobs[i].last_status)
+                    file_name: str = f"{RESULTS_FOLDER_NAME}/results_tests_{str(i)}.csv"
+                    jobs[i].save_to_file(file_name, f"{RESULTS_FOLDER_NAME}/{zip_file_name}")
                 elif jobs[i].last_status in ["ERROR", "CANCELLED"]:
-                    print(i, jobs[i].last_status)
                     print(jobs[i].queued_job.error_message())
                     print(jobs[i].queued_job.metrics()["usage"]["quantum_seconds"])
 
         for job in jobs:
             if job.last_status not in ["ERROR", "CANCELLED", "DONE"]:
-                ndone = True
+                results_ready = False
 
 
 def noiseless_pipeline() -> None:
@@ -161,8 +162,8 @@ def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
 
     print(f"{datetime.now()}: Preparing backend...")
     backend: IQMFakeBackend = FakeSirius(save_calibration=True)
-    print(f"{datetime.now()}: Selecting best qubits list...")
     if len(qubits_lists) == 0:
+        print(f"{datetime.now()}: Selecting best qubits list...")
         qubits_lists = find_best_qubit_layouts(backend)
     print(f"{datetime.now()}: Preparing jobs...")
     jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
