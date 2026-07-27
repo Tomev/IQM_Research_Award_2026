@@ -97,22 +97,20 @@ def prepare_lg_jobs(qubits_lists: list[list[int] | tuple[int, ...]], backend: Ba
 
 def run_jobs(jobs: list[Job], backend: Backend) -> None:
     """TODO(TR): Docstring"""
-    i: int = 0
-    job_list_path = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
+    job_list_path: str = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
     job_list_table: pd.DataFrame = pd.DataFrame()
 
-    for i in range(N_JOBS_PER_LAYOUT):
+    for job in jobs:
         try:
-            jobs[i].queued_job = backend.run(jobs[i].circuits, shots=N_SHOTS)
+            job.queued_job = backend.run(job.circuits, shots=N_SHOTS)
 
             print(f"{datetime.now()}: job queued")
-            job_data = {
-                "job_id": jobs[i].queued_job.job_id(),
-                "pars": jobs[i].indices_list,
+            job_data: dict = {
+                "job_id": job.queued_job.job_id(),
+                "pars": job.indices_list,
             }
             job_list_table = pd.concat([job_list_table, pd.DataFrame([job_data])], ignore_index=True)
             job_list_table.to_csv(job_list_path)
-            i += 1
         except Exception as alert:
             print(alert)
             time.sleep(WAIT_TIME)
@@ -180,7 +178,6 @@ def main():
     qubits_lists: list[list[int] | tuple[int, ...]] = get_layouts_from_layouts_info(
         "data/2026-07-27_031107_layouts_info.json"
     )
-    print(qubits_lists)
     noisy_pipeline(qubits_lists)
     print("Done")
 
