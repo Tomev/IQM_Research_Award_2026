@@ -67,9 +67,6 @@ class LGResult:
                 (self.raw_results["qubits_set_index"] == qubit_set_idx) & (self.raw_results["i"] == steering_bit)
             ]
             for state in STATES_ORDER:
-                # print(state)
-                # print(selected_row)
-                # print(selected_row[state].to_numpy())
                 a.append(selected_row[state].to_numpy()[0])
 
             b.append(a)
