@@ -1,31 +1,19 @@
-import json
 import os
 from math import sin, sqrt
 
 import pandas as pd
 
+from src.pipelines import get_layouts_from_layouts_info
+
 # Settings
-N_LAYOUTS = 1
-N_JOBS = 10
+N_JOBS_PER_LAYOUT: int = 10
+N_STEERIING_BITS: int = 8
 
 STATES_ORDER = ["000", "100", "010", "110", "001", "101", "011", "111"]
-LAYOUTS = [[1, 0, 2]]
+
+
+LAYOUTS = get_layouts_from_layouts_info("./data/2026-07-27_203226_layouts_info.json")
 DATA_FOLDER: str = os.environ["EXP_DATA_PATH"]
-
-
-def load_json(json_file_path):
-    with open(json_file_path, "r") as json_file:
-        json_data = json.load(json_file)
-
-    metadata = {
-        "jobs": json_data["jobs"],  # ile jobów wykonujemy
-        "shots": json_data["shots"],  # ile shotów dla każdego układu
-        "repetitions": json_data["repetitions"],  # ile shotów dla każdego układu
-        "randomization": json_data["randomization"],  # randomizacja kątów włączona/wyłączona
-        "backend": json_data["backend"],
-    }
-
-    return metadata
 
 
 class LGResult:
@@ -37,12 +25,15 @@ class LGResult:
 
     def Calculate(self, qubit_set_idx):
         b = []
-        for steering_bit in range(8):
+        for steering_bit in range(N_STEERIING_BITS):
             a = []
             selected_row = self.raw_results.loc[
                 (self.raw_results["qubits_set_index"] == qubit_set_idx) & (self.raw_results["i"] == steering_bit)
             ]
             for state in STATES_ORDER:
+                # print(state)
+                # print(selected_row)
+                # print(selected_row[state].to_numpy())
                 a.append(selected_row[state].to_numpy()[0])
 
             b.append(a)
@@ -55,78 +46,80 @@ class LGResult:
 
 
 def main():
-    summed_result = LGResult(pd.DataFrame())
-    results_path = "results"
-    for i in range(N_JOBS):
-        pd_result = pd.read_csv(f"{DATA_FOLDER}/results_tests_{i}.csv")
 
-        summed_result.AppendResults(pd_result)
+    for layout_index in range(len(LAYOUTS)):
+        print(layout_index)
 
-        raw_results = LGResult(pd.DataFrame())
-        raw_results.AppendResults(pd_result)
+        summed_result = LGResult(pd.DataFrame())
 
-        raw_results.SumResults()
+        for i in range(N_JOBS_PER_LAYOUT):
+            pd_result = pd.read_csv(f"{DATA_FOLDER}/results_tests_{i + len(LAYOUTS) * layout_index}.csv")
 
-    summed_result.SumResults()
+            summed_result.AppendResults(pd_result)
 
-    weak_meas_rotation_angle_v = 0.1  # That's our weak measurement rotation angle.
-    weak_meas_rotation_angle = sin(weak_meas_rotation_angle_v)
+            raw_results = LGResult(pd.DataFrame())
+            raw_results.AppendResults(pd_result)
 
-    inequality_values_AB = []
-    inequality_values_BA = []
-    inequality_values_AbC = []
-    inequality_values_bAC = []
-    inequality_values_BaC = []
-    inequality_values_aBC = []
-    inequality_errors_AB = []
-    inequality_errors_BA = []
-    inequality_errors_AbC = []
-    inequality_errors_bAC = []
-    inequality_errors_BaC = []
-    inequality_errors_aBC = []
-    order = []
-    eorder = []
-    val_abC = []
-    val_baC = []
-    er_abC = []
-    er_baC = []
-    val_AB = []
-    val_BA = []
-    er_AB = []
-    er_BA = []
-    val_ABC = []
-    val_BAC = []
-    er_ABC = []
-    er_BAC = []
-    val_BaC = []
-    val_aBC = []
-    er_BaC = []
-    er_aBC = []
-    val_AbC = []
-    val_bAC = []
-    er_AbC = []
-    er_bAC = []
-    val_Ab = []
-    val_bA = []
-    er_Ab = []
-    er_bA = []
-    val_aB = []
-    val_Ba = []
-    er_aB = []
-    er_Ba = []
+            raw_results.SumResults()
 
-    qubs = []
-    # inequality_values_mean = []
+        summed_result.SumResults()
 
-    for qubit_set_idx in range(N_LAYOUTS):
-        counts_per_steering_bit = summed_result.Calculate(qubit_set_idx)
+        weak_meas_rotation_angle_v = 0.1  # That's our weak measurement rotation angle.
+        weak_meas_rotation_angle = sin(weak_meas_rotation_angle_v)
+
+        inequality_values_AB = []
+        inequality_values_BA = []
+        inequality_values_AbC = []
+        inequality_values_bAC = []
+        inequality_values_BaC = []
+        inequality_values_aBC = []
+        inequality_errors_AB = []
+        inequality_errors_BA = []
+        inequality_errors_AbC = []
+        inequality_errors_bAC = []
+        inequality_errors_BaC = []
+        inequality_errors_aBC = []
+        order = []
+        eorder = []
+        val_abC = []
+        val_baC = []
+        er_abC = []
+        er_baC = []
+        val_AB = []
+        val_BA = []
+        er_AB = []
+        er_BA = []
+        val_ABC = []
+        val_BAC = []
+        er_ABC = []
+        er_BAC = []
+        val_BaC = []
+        val_aBC = []
+        er_BaC = []
+        er_aBC = []
+        val_AbC = []
+        val_bAC = []
+        er_AbC = []
+        er_bAC = []
+        val_Ab = []
+        val_bA = []
+        er_Ab = []
+        er_bA = []
+        val_aB = []
+        val_Ba = []
+        er_aB = []
+        er_Ba = []
+
+        qubs = []
+        # inequality_values_mean = []
+        counts_per_steering_bit = summed_result.Calculate(0)
 
         n_shots = 0
 
-        for measured_state_idx in range(8):
+        for measured_state_idx in range(N_STEERIING_BITS):
             n_shots += counts_per_steering_bit[0][measured_state_idx]
 
-        print("Qubit_set_index:", qubit_set_idx)
+        print("Qubit_set_index:", layout_index)
         print("Trials: ", n_shots)
 
         # print(counts_per_steering_bit)
@@ -140,7 +133,7 @@ def main():
         c = []
         print("xxC")
 
-        for steering_bit in range(8):
+        for steering_bit in range(N_STEERIING_BITS):
             sc = (
                 +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
                 + counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
@@ -279,7 +272,7 @@ def main():
         aB = -(bb[4] - bb[7] - bb[6] + bb[5]) / (n_shots * weak_meas_rotation_angle * 4)
         eaB = 4 - (bb[4] ** 2 + bb[7] ** 2 + bb[6] ** 2 + bb[5] ** 2) / (n_shots) ** 2
         print(aB, sqrt(eaB / n_shots) / (4 * weak_meas_rotation_angle))
-        qubs.append(LAYOUTS[qubit_set_idx])
+        qubs.append(LAYOUTS[layout_index])
         wBA = (bAC + BaC) ** 2 / (4 * baC * BAC)
         wAB = (AbC + aBC) ** 2 / (4 * abC * ABC)
         inequality_values_BA.append(wBA)
@@ -323,82 +316,82 @@ def main():
         er_aB.append(sqrt(eaB / n_shots) / (4 * weak_meas_rotation_angle))
         er_Ba.append(sqrt(eBa / n_shots) / (4 * weak_meas_rotation_angle))
 
-    indices = range(len(inequality_values_AB))
-    df = pd.DataFrame(
-        columns=[
-            "qubits",
-            "LGBA",
-            "LGeBA",
-            "LGAB",
-            "LGeAB",
-            "ABC",
-            "eABC",
-            "BAC",
-            "eBAC",
-            "AbC",
-            "eAbC",
-            "bAC",
-            "ebAC",
-            "BaC",
-            "eBaC",
-            "aBC",
-            "eaBC",
-            "abC",
-            "eabC",
-            "baC",
-            "ebaC",
-            "AB",
-            "eAB",
-            "BA",
-            "eBA",
-            "Ab",
-            "eAb",
-            "bA",
-            "ebA",
-            "Ba",
-            "eBa",
-            "aB",
-            "eaB",
-        ],
-        index=indices,
-    )
+        indices = range(len(inequality_values_AB))
+        df = pd.DataFrame(
+            columns=[
+                "qubits",
+                "LGBA",
+                "LGeBA",
+                "LGAB",
+                "LGeAB",
+                "ABC",
+                "eABC",
+                "BAC",
+                "eBAC",
+                "AbC",
+                "eAbC",
+                "bAC",
+                "ebAC",
+                "BaC",
+                "eBaC",
+                "aBC",
+                "eaBC",
+                "abC",
+                "eabC",
+                "baC",
+                "ebaC",
+                "AB",
+                "eAB",
+                "BA",
+                "eBA",
+                "Ab",
+                "eAb",
+                "bA",
+                "ebA",
+                "Ba",
+                "eBa",
+                "aB",
+                "eaB",
+            ],
+            index=indices,
+        )
 
-    for i in indices:
-        df.loc[i, "qubits"] = qubs[i]
-        df.loc[i, "LGBA"] = inequality_values_BA[i]
-        df.loc[i, "LGeBA"] = inequality_errors_BA[i]
-        df.loc[i, "LGAB"] = inequality_values_AB[i]
-        df.loc[i, "LGeAB"] = inequality_errors_AB[i]
-        df.loc[i, "BA"] = val_BA[i]
-        df.loc[i, "eBA"] = er_BA[i]
-        df.loc[i, "AB"] = val_AB[i]
-        df.loc[i, "eAB"] = er_AB[i]
-        df.loc[i, "BaC"] = val_BaC[i]
-        df.loc[i, "eBaC"] = er_BaC[i]
-        df.loc[i, "aBC"] = val_aBC[i]
-        df.loc[i, "eaBC"] = er_aBC[i]
-        df.loc[i, "bAC"] = val_bAC[i]
-        df.loc[i, "ebAC"] = er_bAC[i]
-        df.loc[i, "AbC"] = val_AbC[i]
-        df.loc[i, "eAbC"] = er_AbC[i]
-        df.loc[i, "BAC"] = val_BAC[i]
-        df.loc[i, "eBAC"] = er_BAC[i]
-        df.loc[i, "ABC"] = val_ABC[i]
-        df.loc[i, "eABC"] = er_ABC[i]
-        df.loc[i, "baC"] = val_baC[i]
-        df.loc[i, "ebaC"] = er_baC[i]
-        df.loc[i, "abC"] = val_abC[i]
-        df.loc[i, "eabC"] = er_abC[i]
-        df.loc[i, "Ba"] = val_Ba[i]
-        df.loc[i, "eBa"] = er_Ba[i]
-        df.loc[i, "aB"] = val_aB[i]
-        df.loc[i, "eaB"] = er_aB[i]
-        df.loc[i, "bA"] = val_bA[i]
-        df.loc[i, "ebA"] = er_bA[i]
-        df.loc[i, "Ab"] = val_Ab[i]
-        df.loc[i, "eAb"] = er_Ab[i]
+        for i in indices:
+            df.loc[i, "qubits"] = qubs[i]
+            df.loc[i, "LGBA"] = inequality_values_BA[i]
+            df.loc[i, "LGeBA"] = inequality_errors_BA[i]
+            df.loc[i, "LGAB"] = inequality_values_AB[i]
+            df.loc[i, "LGeAB"] = inequality_errors_AB[i]
+            df.loc[i, "BA"] = val_BA[i]
+            df.loc[i, "eBA"] = er_BA[i]
+            df.loc[i, "AB"] = val_AB[i]
+            df.loc[i, "eAB"] = er_AB[i]
+            df.loc[i, "BaC"] = val_BaC[i]
+            df.loc[i, "eBaC"] = er_BaC[i]
+            df.loc[i, "aBC"] = val_aBC[i]
+            df.loc[i, "eaBC"] = er_aBC[i]
+            df.loc[i, "bAC"] = val_bAC[i]
+            df.loc[i, "ebAC"] = er_bAC[i]
+            df.loc[i, "AbC"] = val_AbC[i]
+            df.loc[i, "eAbC"] = er_AbC[i]
+            df.loc[i, "BAC"] = val_BAC[i]
+            df.loc[i, "eBAC"] = er_BAC[i]
+            df.loc[i, "ABC"] = val_ABC[i]
+            df.loc[i, "eABC"] = er_ABC[i]
+            df.loc[i, "baC"] = val_baC[i]
+            df.loc[i, "ebaC"] = er_baC[i]
+            df.loc[i, "abC"] = val_abC[i]
+            df.loc[i, "eabC"] = er_abC[i]
+            df.loc[i, "Ba"] = val_Ba[i]
+            df.loc[i, "eBa"] = er_Ba[i]
+            df.loc[i, "aB"] = val_aB[i]
+            df.loc[i, "eaB"] = er_aB[i]
+            df.loc[i, "bA"] = val_bA[i]
+            df.loc[i, "ebA"] = er_bA[i]
+            df.loc[i, "Ab"] = val_Ab[i]
+            df.loc[i, "eAb"] = er_Ab[i]
 
-    df.to_csv(f"{DATA_FOLDER}/{results_path}.csv")
+        df.to_csv(f"{DATA_FOLDER}/lg_results_summary_layout_{LAYOUTS[layout_index]}.csv")
 
 
 if __name__ == "__main__":
