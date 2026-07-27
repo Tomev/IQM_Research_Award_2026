@@ -4,12 +4,13 @@ TODO(TR): Docstring
 
 import ast
 import json
+import os
 import time
 from datetime import datetime
 
 import pandas as pd
-from IPython.utils import data
 from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
+from iqm.qiskit_iqm.iqm_provider import IQMBackend, IQMProvider
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit_aer import AerSimulator
 
@@ -19,6 +20,11 @@ from src.simulator import FakeSirius
 from src.utils import star_device_transpile
 
 # TODO(TR): Refactor those settings.
+# There are 8 angles per layout in the job. This means the number of circuits in a single job is equal to
+#   N_CIRCUITS = 8 x N_REPETITIONS
+#
+# Prefered setup is N_REPETITONS = 10, meaning that we can only handle 1 qubit layout per job. That is because maximal
+# number of circuits per job is 100 (on IQM Sirius).
 N_JOBS_PER_LAYOUT: int = 10
 N_REPETITIONS: int = 10
 N_SHOTS: int = int(10e4)
@@ -28,12 +34,13 @@ N_SHOTS: int = int(10e4)
 # N_REPETITIONS = 1
 # N_SHOTS: int = int(10e3)
 
+NOW: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 WAIT_TIME: int = 10  # TODO(TR): Adjust or remove.
 RESULTS_FOLDER_NAME: str = "./data"
-RESULTS_FILE_NAME: str = "job_list_lga_sim2zz.csv"
+RESULTS_FILE_NAME: str = "lg_jobs_summary.csv"
 
 
-Backend = AerSimulator | IQMFakeBackend
+Backend = AerSimulator | IQMBackendBase
 
 
 def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> list[tuple[int, ...]]:
@@ -67,7 +74,7 @@ def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> lis
 
     save_layouts_info(best_layouts)
 
-    return [layout for layout, cost in best_layouts]
+    return [layout for layout, _ in best_layouts]
 
 
 def save_layouts_info(layouts: list[tuple[tuple[int, ...], float]]) -> None:
@@ -81,7 +88,7 @@ def save_layouts_info(layouts: list[tuple[tuple[int, ...], float]]) -> None:
     layouts_info_dict: dict[str, float] = {str(layout): cost for layout, cost in layouts}
 
     # Save dict to a file
-    with open(f"{RESULTS_FOLDER_NAME}/{datetime.now().strftime('%Y-%m-%d_%H%M%S')}_layouts_info.json", "w") as f:
+    with open(f"{RESULTS_FOLDER_NAME}/{NOW}_layouts_info.json", "w") as f:
         json.dump(layouts_info_dict, f, indent=4)
 
 
@@ -169,7 +176,7 @@ def run_jobs(jobs: list[Job], backend: Backend) -> None:
         period before continuing. This is to prevent internet connection-related issues during the circuits
         execution on a real hardware.
     """
-    job_list_path: str = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
+    job_list_path: str = f"{RESULTS_FOLDER_NAME}/{NOW}_{RESULTS_FILE_NAME}"
     job_list_table: pd.DataFrame = pd.DataFrame()
 
     for i, job in enumerate(jobs):
@@ -226,6 +233,34 @@ def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
                 results_ready = False
 
 
+def get_backend() -> IQMBackend:
+    """
+    Get the quantum backend from the IQM provider.
+
+    Returns:
+        An instance of :class:`IQMBackendBase` representing the quantum backend.
+
+    Raises:
+        EnvironmentError: If the required environment variables (`IQM_PROVIDER` or `IQM_COMPUTER`)
+                          are not set.
+    """
+    return IQMProvider(
+        os.environ["IQM_PROVIDER"],
+        quantum_computer=os.environ["IQM_COMPUTER"],
+    ).get_backend()
+
+
+def save_calibration() -> None:
+    """
+    Save calibration data for the fake device. The fake device is not used in this function, but is only used to for
+    it's functionalities of saving the calibration data.
+
+    TODO(TR): Separate calibration saving from fake backends preparation.
+    """
+
+    FakeSirius(save_calibration=True)
+
+
 def noiseless_pipeline() -> None:
     """
     Execute a noiseless simulation pipeline using a quantum simulator backend.
@@ -248,7 +283,7 @@ def noiseless_pipeline() -> None:
     print(f"{datetime.now()}: Running jobs...")
     run_jobs(jobs, backend)
     print(f"{datetime.now()}: Waiting and saving results...")
-    wait_and_save_results(jobs, zip_file_name="iqm_lg_noiseless_results")
+    wait_and_save_results(jobs, zip_file_name=f"{NOW}_iqm_lg_noiseless_results")
 
 
 def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
@@ -280,15 +315,48 @@ def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
     print(f"{datetime.now()}: Running jobs...")
     run_jobs(jobs, backend)
     print(f"{datetime.now()}: Waiting and saving results...")
-    wait_and_save_results(jobs, zip_file_name=f"iqm_lg_noisy_{backend.name}_results")
+    wait_and_save_results(jobs, zip_file_name=f"{NOW}_iqm_lg_noisy_{backend.name}_results")
+
+
+def device_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
+    """
+    Execute a pipeline on a real quantum device using the specified qubit layouts.
+
+    This function prepares the jobs with the specified qubit layouts, runs them on a real quantum backend,
+    and saves the results. If no layouts are provided, the function first identifies the best layouts
+    based on the cost evaluator before proceeding with job execution.
+
+    Args:
+        qubits_lists:
+            A list of qubit layouts, where each layout is a list or tuple of integers representing qubit indices.
+            If empty, the best layouts are automatically determined using :func:`find_best_qubit_layouts`.
+
+    See Also:
+        :func:`find_best_qubit_layouts` for automatic layout selection.
+        :func:`prepare_lg_jobs` for job preparation.
+    """
+
+    print(f"{datetime.now()}: Preparing backend...")
+    backend: IQMBackend = get_backend()
+    save_calibration()
+    if len(qubits_lists) == 0:
+        print(f"{datetime.now()}: Selecting best qubits list...")
+        qubits_lists = find_best_qubit_layouts(backend)
+    print(f"{datetime.now()}: Preparing jobs...")
+    jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
+    print(f"{datetime.now()}: Running jobs...")
+    run_jobs(jobs, backend)
+    print(f"{datetime.now()}: Waiting and saving results...")
+    wait_and_save_results(jobs, zip_file_name=f"{NOW}_iqm_lg_real_{backend.name}_results")
 
 
 def main():
-    print(f"{datetime.now()} Start")
+    print(f"{datetime.now()}: Start")
     # noiseless_pipeline()
     qubits_lists: list[list[int] | tuple[int, ...]] = get_layouts_from_layouts_info("")
-    noisy_pipeline(qubits_lists)
-    print(f"{datetime.now()} Done")
+    # noisy_pipeline(qubits_lists)
+    device_pipeline(qubits_lists)
+    print(f"{datetime.now()}: Done")
 
 
 if __name__ == "__main__":
