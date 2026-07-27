@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 
 import pandas as pd
+from IPython.utils import data
 from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit_aer import AerSimulator
@@ -142,6 +143,7 @@ def prepare_lg_jobs(qubits_lists: list[list[int] | tuple[int, ...]], backend: Ba
             # Transpile the circuits in the job, if needed
             if not issubclass(type(backend), IQMBackendBase):
                 print(f"{datetime.now()}: Skipping circuits transpilation for backend {backend.name}.")
+
                 continue  # Skip noiseless sim.
 
             for i in range(len(jobs[-1].circuits)):
