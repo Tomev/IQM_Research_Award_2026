@@ -116,17 +116,22 @@ def extract_job_summaries(jobs_summary_path: str) -> list[tuple[str, list[list[i
 
 
 def download_jobs(job_summaries: list[tuple[str, list[list[int]]]], backend: IQMBackend) -> list[LGACZ2]:
-    """Downloads the results of specified jobs from the quantum backend.
+    """
+    Downloads jobs from the quantum backend based on the provided job summaries.
 
-    Retrieves the job results for a list of job IDs and converts them into instances
-    of the :class:`LGACZ2` class, which are used for further processing and analysis.
+    Iterates over the list of job summaries, retrieves each job from the backend,
+    and initializes an instance of the :class:`LGACZ2` class with the corresponding
+    job data and settings.
 
     Args:
-        job_ids: A list of strings representing the unique identifiers of the quantum jobs.
-        backend: The IQM backend from which the job results will be retrieved.
+        job_summaries: A list of tuples, each containing a job ID (str) and the
+                       steering bit order (list[list[int]]) for that job.
+        backend: The :class:`IQMBackend` instance used to retrieve the jobs from
+                 the quantum backend.
 
     Returns:
-        A list of :class:`LGACZ2` objects, each containing the results of a corresponding job.
+        A list of :class:`LGACZ2` instances, each populated with the data from
+        the corresponding job retrieved from the backend.
     """
     jobs: list[LGACZ2] = []
 
