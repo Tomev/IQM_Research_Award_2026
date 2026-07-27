@@ -89,11 +89,12 @@ def prepare_lg_jobs(qubits_lists: list[list[int] | tuple[int, ...]], backend: Ba
             job.add_test_circuits([[0, 1, 2]], 0.1)  # Qubits will be adjusted during transpilation.
             jobs.append(job)
 
-        if not issubclass(type(backend), IQMBackendBase):
-            continue  # Skip noiseless sim.
+            # Transpile the circuits in the job, if needed
+            if not issubclass(type(backend), IQMBackendBase):
+                continue  # Skip noiseless sim.
 
-        for i in range(len(jobs[-1].circuits)):
-            jobs[-1].circuits[i] = star_device_transpile(jobs[-1].circuits[i], backend, qubits_list)
+            for i in range(len(jobs[-1].circuits)):
+                jobs[-1].circuits[i] = star_device_transpile(jobs[-1].circuits[i], backend, qubits_list)
 
     return jobs
 
