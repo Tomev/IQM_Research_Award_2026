@@ -48,6 +48,7 @@ COLUMNS: list[str] = [
 
 
 LAYOUTS = get_layouts_from_layouts_info("./data/noisy_1e4_shots/2026-07-27_203226_layouts_info.json")
+LAYOUTS = [(4, 5, 6)]  # For gate sirius experiment
 DATA_FOLDER: str = os.environ["EXP_DATA_PATH"]
 
 
@@ -81,7 +82,6 @@ class LGResult:
 
 
 def main():
-
     aggregated_df: pd.DataFrame = pd.DataFrame(columns=COLUMNS)
 
     for layout_index in range(len(LAYOUTS)):
