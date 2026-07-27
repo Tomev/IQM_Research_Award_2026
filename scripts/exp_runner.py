@@ -1,37 +1,86 @@
-""" """
+"""
+TODO(TR): Docstring
+"""
 
+import ast
+import json
 import time
 from datetime import datetime
 
 import pandas as pd
 from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
+from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit_aer import AerSimulator
 
 from src.jobs import LGACZ2, Job
+from src.selector import IQMStarCostEvaluator
 from src.simulator import FakeSirius
 from src.utils import star_device_transpile
 
 # TODO(TR): Refactor those settings.
-# N_JOBS: int = 10
+# N_JOBS_PER_LAYOUT: int = 10
 # N_REPETITIONS: int = 10
 # N_SHOTS: int = int(10e4)
-N_JOBS: int = 1
+N_JOBS_PER_LAYOUT: int = 1
 N_REPETITIONS = 1
 N_SHOTS: int = int(10e3)
 WAIT_TIME: int = 10  # TODO(TR): Adjust or remove.
 RESULTS_FOLDER_NAME: str = "./data"
 RESULTS_FILE_NAME: str = "job_list_lga_sim2zz.csv"
-ZIP_FILE_NAME: str = "iqm_lg_results"  # No extension.
 
 
 Backend = AerSimulator | IQMFakeBackend
+
+
+def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> list[tuple[int, ...]]:
+    """TODO(TR): Docstring"""
+
+    # Create a job for evaluator
+    job: LGACZ2 = LGACZ2()
+    job.n_repetitions = N_REPETITIONS
+    job.add_test_circuits([[0, 1, 2]], 0.1)
+
+    circuit: QuantumCircuit = job.circuits[0]
+
+    evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
+
+    best_layouts: list[tuple[tuple[int, ...], float]] = evaluator.get_top_layouts(n_layouts)
+
+    save_layouts_info(best_layouts)
+
+    return [layout for layout, cost in best_layouts]
+
+
+def save_layouts_info(layouts: list[tuple[tuple[int, ...], float]]) -> None:
+    """
+    TODO(TR): Docstrings
+    """
+    layouts_info_dict: dict[str, float] = {str(layout): cost for layout, cost in layouts}
+
+    # Save dict to a file
+    with open(f"{RESULTS_FOLDER_NAME}/{datetime.now().strftime('%Y-%m-%d_%H%M%S')}_layouts_info.json", "w") as f:
+        json.dump(layouts_info_dict, f, indent=4)
+
+
+def get_layouts_from_layouts_info(info_file_path: str) -> list[tuple[int, ...]]:
+    """TODO(TR): Docstring"""
+    try:
+        with open(info_file_path, "r") as f:
+            layouts: dict[str, float] = json.load(f)
+
+        return [ast.literal_eval(key) for key in layouts.keys()]
+
+    except Exception as e:
+        print(e)
+        print("Returning empty list to trigger automatic best layers search.")
+        return []
 
 
 def prepare_lg_jobs(qubits_lists: list[list[int] | tuple[int, ...]], backend: Backend) -> list[Job]:
     """TODO(TR): Docstring"""
     jobs: list[Job] = []
     for qubits_list in qubits_lists:
-        for _ in range(N_JOBS):
+        for _ in range(N_JOBS_PER_LAYOUT):
             job: LGACZ2 = LGACZ2()
             job.n_repetitions = N_REPETITIONS
             job.add_test_circuits([[0, 1, 2]], 0.1)  # Qubits will be adjusted during transpilation.
@@ -52,7 +101,7 @@ def run_jobs(jobs: list[Job], backend: Backend) -> None:
     job_list_path = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
     job_list_table: pd.DataFrame = pd.DataFrame()
 
-    for i in range(N_JOBS):
+    for i in range(N_JOBS_PER_LAYOUT):
         try:
             jobs[i].queued_job = backend.run(jobs[i].circuits, shots=N_SHOTS)
 
@@ -78,7 +127,7 @@ def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
         ndone = False
         time.sleep(WAIT_TIME)
 
-        for i in range(N_JOBS):
+        for i in range(len(jobs)):
             if jobs[i].update_status():
                 print(i, jobs[i].last_status)
                 if jobs[i].last_status == "DONE" and not jobs[i].if_saved:
@@ -89,8 +138,9 @@ def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
                     print(i, jobs[i].last_status)
                     print(jobs[i].queued_job.error_message())
                     print(jobs[i].queued_job.metrics()["usage"]["quantum_seconds"])
-        for i in range(N_JOBS):
-            if jobs[i].last_status not in ["ERROR", "CANCELLED", "DONE"]:
+
+        for job in jobs:
+            if job.last_status not in ["ERROR", "CANCELLED", "DONE"]:
                 ndone = True
 
 
@@ -108,14 +158,14 @@ def noiseless_pipeline() -> None:
     wait_and_save_results(jobs, zip_file_name="iqm_lg_noiseless_results")
 
 
-def noisy_pipeline(find_best_qubits: bool = False) -> None:
+def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
     """TODO(TR): Docstring"""
 
     print(f"{datetime.now()}: Preparing backend...")
-    backend: Backend = FakeSirius()
+    backend: IQMFakeBackend = FakeSirius(save_calibration=True)
     print(f"{datetime.now()}: Selecting best qubits list...")
-    # TODO(TR): Add best qubits selection
-    qubits_lists: list[list[int] | tuple[int, ...]] = [[1, 0, 2], [3, 4, 5]]
+    if len(qubits_lists) == 0:
+        qubits_lists = find_best_qubit_layouts(backend)
     print(f"{datetime.now()}: Preparing jobs...")
     jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
     print(f"{datetime.now()}: Running jobs...")
@@ -127,7 +177,11 @@ def noisy_pipeline(find_best_qubits: bool = False) -> None:
 def main():
     print("Start")
     # noiseless_pipeline()
-    noisy_pipeline()
+    qubits_lists: list[list[int] | tuple[int, ...]] = get_layouts_from_layouts_info(
+        "data/2026-07-27_031107_layouts_info.json"
+    )
+    print(qubits_lists)
+    noisy_pipeline(qubits_lists)
     print("Done")
 
 
