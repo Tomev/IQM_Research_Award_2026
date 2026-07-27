@@ -3,6 +3,7 @@ Utility module for handling general-purpose handling of quantum devices and circ
 """
 
 import os
+from datetime import datetime
 
 from iqm.qiskit_iqm import IQMBackend, transpile_to_IQM
 from iqm.qiskit_iqm.iqm_provider import IQMProvider
@@ -10,7 +11,10 @@ from qiskit import transpile
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 
 from src.jobs import LGACZ2
-from src.pipelines import NOW, RESULTS_FOLDER_NAME
+
+N_REPETITIONS: int = 10
+NOW: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+RESULTS_FOLDER_NAME: str = "./data"
 
 
 def star_device_transpile(circuit: QuantumCircuit, backend: IQMBackend, layout: list[int]) -> QuantumCircuit:
@@ -59,7 +63,7 @@ def get_backend() -> IQMBackend:
     ).get_backend()
 
 
-def gather_jobs_from_device(jobs_summary_path: str) -> None:
+def gather_jobs(jobs_summary_path: str) -> None:
     """Gathers jobs from the quantum device based on a summary file.
 
     Reads a summary file containing job information, retrieves the corresponding jobs
@@ -69,11 +73,15 @@ def gather_jobs_from_device(jobs_summary_path: str) -> None:
         jobs_summary_path: The file path to the CSV summary file containing job IDs
                            and other metadata.
     """
+    print(f"{datetime.now()}: Getting backend...")
     backend: IQMBackend = get_backend()
+    print(f"{datetime.now()}: Downloading jobs...")
     jobs: list[LGACZ2] = download_jobs(extract_job_ids(jobs_summary_path), backend)
     zip_file_name: str = f"{NOW}_iqm_lg_real_{backend.name}_results"
 
+    print(f"{datetime.now()}: Saving jobs...")
     for i, job in enumerate(jobs):
+        print(f"\t {i + 1}/{len(jobs)}...")
         file_name: str = f"{RESULTS_FOLDER_NAME}/results_tests_{str(i)}.csv"
         job.save_to_file(file_name, f"{RESULTS_FOLDER_NAME}/{zip_file_name}")
 
@@ -89,14 +97,18 @@ def extract_job_ids(jobs_summary_path: str) -> list[str]:
     Returns:
         A list of strings, where each string is a job ID extracted from the summary file.
     """
+    print(f"{datetime.now()}: Extracting job ids...")
     job_ids: list[str] = []
 
+    print(f"{datetime.now()}: Got...")
     with open(jobs_summary_path, "r") as f:
         f.readline()  # Skip headers
         line: str = f.readline()
 
         while line:
             job_ids.append(line.split(",")[1])
+            print(f"\t{job_ids[-1]}")
+            line = f.readline()
 
     return job_ids
 
@@ -116,8 +128,12 @@ def download_jobs(job_ids: list[str], backend: IQMBackend) -> list[LGACZ2]:
     """
     jobs: list[LGACZ2] = []
 
+    print(f"{datetime.now()}: Retrieved job...")
     for job_id in job_ids:
+        print(f"\t{job_id}")
         jobs.append(LGACZ2())
+        jobs[-1].n_repetitions = N_REPETITIONS
+        jobs[-1].add_test_circuits([[0, 1, 2]], 0.1)
         jobs[-1].queued_job = backend.retrieve_job(job_id)
 
     return jobs
