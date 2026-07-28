@@ -6,6 +6,7 @@ noiseless pipeline, retrieves qubit layouts, and can be configured to run noisy 
 from datetime import datetime
 
 from src.pipelines import (
+    PullaSettings,
     device_pipeline,
     get_layouts_from_layouts_info,
     noiseless_pipeline,
@@ -23,7 +24,12 @@ def main():
     qubits_list = [(4, 5, 6)]
     # noisy_pipeline(qubits_lists)
     # device_pipeline(qubits_lists)
-    pulla_pipeline(qubits_list)
+    settings: PullaSettings = PullaSettings(
+        cz_amplitude_multiplier=None, measure_amplitude_multiplier=0.5, prx_amplitude_multiplier=None
+    )
+
+    pulla_pipeline(qubits_lists, settings)
+
     print(f"{datetime.now()}: Done")
 
 
