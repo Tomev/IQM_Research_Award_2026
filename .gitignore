@@ -3,3 +3,15 @@ data/*
 *__pycache__*
 *.json
 .DS_Store
+# LaTeX
+*.aux
+*.log
+*.out
+*.snm
+*.toc
+*.gz
+TR - CQT_Leggett_Garg_Quantum_Computers.pdf
+*.nav
+Leggett-Garg Inequality-based Quantum Computers Quality.pdf
+*.bbl
+*.blg
