@@ -10,10 +10,14 @@ particularly for testing and benchmarking quantum algorithms and hardware."""
 
 import ast
 import json
+import os
 import time
 from datetime import datetime
 
 import pandas as pd
+from exa.common.data.setting_node import SettingNode
+from iqm.pulla.pulla import Pulla, PullaStash
+from iqm.pulla.utils_qiskit import qiskit_to_pulla, sweep_job_to_qiskit
 from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
 from iqm.qiskit_iqm.iqm_provider import IQMBackend
 from qiskit.circuit.quantumcircuit import QuantumCircuit
@@ -32,7 +36,7 @@ from src.utils import get_backend, star_device_transpile
 # number of circuits per job is 100 (on IQM Sirius).
 #
 
-N_JOBS_PER_LAYOUT: int = 5
+N_JOBS_PER_LAYOUT: int = 3
 N_REPETITIONS: int = 10
 N_SHOTS: int = int(2e4)  # Max number of shots per circuit on IQM Sirius is 20000 (2e4).
 
@@ -338,3 +342,79 @@ def device_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
     run_jobs(jobs, backend)
     print(f"{datetime.now()}: Waiting and saving results...")
     wait_and_save_results(jobs, zip_file_name=f"{NOW}_iqm_lg_real_{backend.name}_results")
+
+
+def pulla_pipeline(qubits_lists: list[list[int] | tuple[int, ...]], cz_amplitude_multiplier: float = 0.8) -> None:
+    """TODO(TR): Docstring"""
+    print(f"{datetime.now()}: Preparing backend...")
+    backend: IQMBackend = get_backend()
+    save_calibration()
+    if len(qubits_lists) == 0:
+        print(f"{datetime.now()}: Selecting best qubits list...")
+        qubits_lists = find_best_qubit_layouts(backend)
+    print(f"{datetime.now()}: Preparing jobs...")
+    jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
+    print(f"{datetime.now()}: Execute jobs with pulla...")
+    execute_with_pulla(jobs, backend, cz_amplitude_multiplier)
+
+
+def execute_with_pulla(qiskit_jobs: list[Job], backend: IQMBackend, cz_amplitude_multiplier: float) -> None:
+    """TODO(TR): Docstring"""
+    job_list_path: str = f"{RESULTS_FOLDER_NAME}/{NOW}_{RESULTS_FILE_NAME}"
+    job_list_table: pd.DataFrame = pd.DataFrame()
+
+    print(f"{datetime.now()}: Getting pulla...")
+    # Define the standard compiler that loads the default calibration set as its initial operating point.
+    pulla: Pulla = Pulla(os.environ["IQM_PROVIDER"], quantum_computer=os.environ["IQM_COMPUTER"])
+
+    for i, job in enumerate(qiskit_jobs):
+        print(f"{datetime.now()}: Preparing job {i} pulla circuits and compiler...")
+        pulla_circuits, compiler = qiskit_to_pulla(pulla, backend, job.circuits)
+        print(f"{datetime.now()}: Getting pulla compiler settings...")
+        settings: SettingNode = compiler.get_settings(circuits=pulla_circuits)
+        print(f"{datetime.now()}: Adjusting pulla settings...")
+        modify_cz_amplitudes(pulla, settings, cz_amplitude_multiplier)
+        settings.set_shots(N_SHOTS)
+        print(f"{datetime.now()}: Compiling pulla job definition...")
+        job_definition, context = compiler.compile(pulla_circuits, settings=settings)
+        print(f"{datetime.now()}: Running job {i + 1} (of {len(qiskit_jobs)})...")
+        # Save the job data first, so that the order of steering bits is not lost!
+        job_data: dict = {
+            "job_id": job.queued_job.job_id(),
+            "pars": job.indices_list,
+        }
+        job_list_table = pd.concat([job_list_table, pd.DataFrame([job_data])], ignore_index=True)
+        job_list_table.to_csv(job_list_path)
+        job = pulla.submit_playlist(job_definition, context=context)
+        print(f"{datetime.now()}: Waiting for job {i + 1} to finish...")
+        job.wait_for_completion()
+        print(f"{datetime.now()}: Job finished.")
+        results_file_path: str = f"{RESULTS_FOLDER_NAME}/{NOW}_pulla_{i}.json"
+        print(f"{datetime.now()}: Saving counts to {results_file_path}...")
+        qiskit_result = sweep_job_to_qiskit(job, shots=N_SHOTS)
+        print(qiskit_result.get_counts())
+
+        with open(results_file_path, "w", encoding="utf-8") as f:
+            json.dump(qiskit_result.get_counts(), f, indent=4)
+
+
+def modify_cz_amplitudes(pulla: Pulla, settings: SettingNode, cz_amplitude_multiplier: float) -> None:
+    """TODO(TR): Docstring"""
+    modified_amplitudes: dict[str, float] = compute_modified_cz_amplitude(pulla, cz_amplitude_multiplier)
+
+    for key, v in modified_amplitudes.items():
+        settings[key] = v
+
+
+def compute_modified_cz_amplitude(pulla: Pulla, amplitude_multiplier: float = 0.8) -> dict[str, float]:
+    """TODO(TR): Docstring"""
+
+    calibration_stash: PullaStash = pulla.get_calibration_stash()
+    calibration_override: dict[str, float] = {}
+
+    for k, v in calibration_stash.observations.items():
+        if "amplitude" in k and "cz" in k:
+            calibration_override[k] = v.value * amplitude_multiplier
+            # print(f"{k}: {v.value} vs {calibration_override[k]}")
+
+    return calibration_override
