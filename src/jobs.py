@@ -32,6 +32,7 @@ class Job:
         self.last_status = None
         self.test_circuits_number = None
         self.if_saved = False
+        self.result_counts = None
 
     def update_status(self):
         """TODO(TR): Docsting"""
@@ -206,9 +207,10 @@ class LGA(TestJob):
 
     def save_to_file(self, csv_path, zip_filename):
         """TODO(TR): Docstring"""
-        result_counts: list[dict[str, int]] = self.queued_job.result().get_counts()
+        if not self.result_counts:
+            self.result_counts = self.queued_job.result().get_counts()
 
-        pandas_table = pd.DataFrame.from_dict(result_counts).fillna(0)
+        pandas_table = pd.DataFrame.from_dict(self.result_counts).fillna(0)
         measurement_angle_indices: list[int] = []
         qubit_lists_indices: list[int] = []
 
@@ -232,6 +234,8 @@ class LGA(TestJob):
             os.remove(csv_path)
         except Exception as alert:
             print(alert)
+
+        self.result_counts = None
 
 
 class LGACZ(LGA):
