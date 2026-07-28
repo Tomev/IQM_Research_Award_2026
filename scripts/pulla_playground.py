@@ -4,11 +4,8 @@ import os
 from datetime import datetime
 
 from iqm.pulla.pulla import Pulla, PullaStash
-from iqm.pulla.utils_qiskit import qiskit_to_pulla, sweep_job_to_qiskit
-from iqm.pulse.playlist.visualisation.base import inspect_playlist
+from iqm.pulla.utils_qiskit import qiskit_to_pulla
 from iqm.qiskit_iqm import IQMBackend
-from qiskit import QuantumCircuit, visualization
-from qiskit.compiler import transpile
 
 from src.jobs import LGACZ2, Job
 from src.pipelines import prepare_lg_jobs
