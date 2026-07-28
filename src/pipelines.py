@@ -345,7 +345,27 @@ def device_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
 
 
 def pulla_pipeline(qubits_lists: list[list[int] | tuple[int, ...]], cz_amplitude_multiplier: float = 0.8) -> None:
-    """TODO(TR): Docstring"""
+    """
+    Execute a pipeline using the Pulla framework with damped CZ gate amplitudes on a real quantum device.
+
+    Args:
+        qubits_lists:
+            A list of qubit layouts, where each layout is a list or tuple of integers representing qubit indices.
+            If empty, the best layouts are automatically determined using :func:`find_best_qubit_layouts`.
+        cz_amplitude_multiplier:
+            A multiplier factor applied to the CZ gate amplitudes in the calibration settings.
+            This allows for tuning the gate strengths for specific experimental purposes.
+
+    Notes:
+        This function prepares the jobs with the specified qubit layouts, runs them on a real quantum backend
+        using the Pulla framework, and saves the results. The CZ gate amplitudes in the calibration settings
+        are adjusted by the given multiplier before execution. If no layouts are provided, the function
+        first identifies the best layouts based on the cost evaluator before proceeding with job execution.
+
+    See Also:
+        :func:`find_best_qubit_layouts` for automatic layout selection.
+        :func:`execute_with_pulla` for the core execution logic with Pulla.
+    """
     print(f"{datetime.now()}: Preparing backend...")
     backend: IQMBackend = get_backend()
     save_calibration()
@@ -359,7 +379,26 @@ def pulla_pipeline(qubits_lists: list[list[int] | tuple[int, ...]], cz_amplitude
 
 
 def execute_with_pulla(qiskit_jobs: list[Job], backend: IQMBackend, cz_amplitude_multiplier: float) -> None:
-    """TODO(TR): Docstring"""
+    """
+    Execute a quantum job using the Pulla framework with modified CZ gate amplitudes.
+
+    Args:
+        qiskit_jobs:
+            A list of :class:`Job` instances containing quantum circuits to be executed.
+        backend:
+            The quantum backend to use for execution, which must be an :class:`IQMBackend`.
+        cz_amplitude_multiplier:
+            A multiplier factor applied to the CZ gate amplitudes in the calibration settings.
+            This allows for tuning the gate strengths for specific experimental purposes.
+
+    Notes:
+        This function is responsible for converting Qiskit circuits to Pulla format, adjusting the
+        calibration settings with the specified CZ amplitude multiplier, compiling the job definition,
+        submitting the job to the backend, and saving the results in JSON format.
+
+    See Also:
+        :func:`pulla_pipeline` for the high-level function that orchestrates the entire Pulla workflow.
+    """
     job_list_path: str = f"{RESULTS_FOLDER_NAME}/{NOW}_{RESULTS_FILE_NAME}"
     job_list_table: pd.DataFrame = pd.DataFrame()
 
@@ -399,7 +438,22 @@ def execute_with_pulla(qiskit_jobs: list[Job], backend: IQMBackend, cz_amplitude
 
 
 def modify_cz_amplitudes(pulla: Pulla, settings: SettingNode, cz_amplitude_multiplier: float) -> None:
-    """TODO(TR): Docstring"""
+    """
+    Modify the CZ gate amplitudes in the Pulla calibration settings based on the given multiplier.
+
+    Args:
+        pulla:
+            The Pulla instance used for calibration and job execution.
+        settings:
+            The :class:`SettingNode` containing the current calibration settings.
+        cz_amplitude_multiplier:
+            A multiplier factor applied to the CZ gate amplitudes in the calibration settings. This allows
+            for tuning the gate strengths for specific experimental purposes.
+
+    Notes:
+        This function retrieves the current calibration stash from the Pulla instance, computes the modified CZ
+        amplitudes by applying the multiplier, and updates the :class:`SettingNode` with the new values.
+    """
     modified_amplitudes: dict[str, float] = compute_modified_cz_amplitude(pulla, cz_amplitude_multiplier)
 
     for key, v in modified_amplitudes.items():
@@ -407,7 +461,25 @@ def modify_cz_amplitudes(pulla: Pulla, settings: SettingNode, cz_amplitude_multi
 
 
 def compute_modified_cz_amplitude(pulla: Pulla, amplitude_multiplier: float = 0.8) -> dict[str, float]:
-    """TODO(TR): Docstring"""
+    """
+    Compute the modified CZ gate amplitudes based on a given multiplier.
+
+    Args:
+        pulla:
+            The :class:`Pulla` instance containing the calibration stash.
+        amplitude_multiplier:
+            A multiplier factor applied to the CZ gate amplitudes in the calibration settings.
+            This allows for tuning the gate strengths for specific experimental purposes.
+
+    Returns:
+        A dictionary containing the modified CZ gate amplitudes, where keys are parameter names
+        and values are the new amplitude values.
+
+    Notes:
+        This function iterates over the calibration stash, identifies parameters containing
+        "amplitude" and "cz" in their names, and multiplies their values by the provided
+        amplitude multiplier.
+    """
 
     calibration_stash: PullaStash = pulla.get_calibration_stash()
     calibration_override: dict[str, float] = {}
