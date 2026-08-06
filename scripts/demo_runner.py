@@ -9,7 +9,8 @@ import pandas as pd
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from src.jobs import LGACZ2, Job
-from src.simulator import FakeFromBackend, download_system_configuration_json
+from src.simulator import FakeFromBackend
+from src.utils import get_configuration_dicts
 
 # TODO(TR): Refactor those settings.
 SYSTEM_NAME: str = "sirius"
@@ -20,20 +21,6 @@ WAIT_TIME: int = 10  # TODO(TR): Adjust or remove.
 RESULTS_FOLDER_NAME: str = "./data"
 RESULTS_FILE_NAME: str = "job_list_lga_sim2zz.csv"
 ZIP_FILE_NAME: str = "iqm_lg_results"  # No extension.
-
-
-def get_configuration_dicts(system_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    """TODO(TR): Docstring"""
-    cd_path, qd_path = download_system_configuration_json(system_name)
-
-    print("Get quality dict...")
-    with open(qd_path, "r") as f:
-        qd: dict = json.load(f)
-    print("Get calibration dict...")
-    with open(cd_path, "r") as f:
-        cd: dict = json.load(f)
-
-    return cd, qd
 
 
 def run_scripts():
@@ -53,12 +40,7 @@ def run_scripts():
     job_list_path = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
 
     print(f"{datetime.now()}: Downloading backend configuration data")
-    calibration_dict: dict[str, Any]
-    quality_dict: dict[str, Any]
-    calibration_dict, quality_dict = get_configuration_dicts(SYSTEM_NAME)
-
-    print(f"{datetime.now()}: Preparing simulator")
-    backend = FakeFromBackend(SYSTEM_NAME, calibration_dict, quality_dict)
+    
 
     while i < N_JOBS:
         print(f"{datetime.now()}: Starting service")

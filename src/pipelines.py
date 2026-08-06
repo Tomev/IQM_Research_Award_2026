@@ -26,8 +26,8 @@ from qiskit_aer import AerSimulator
 
 from src.jobs import LGACZ2, Job
 from src.selector import IQMStarCostEvaluator
-from src.simulator import FakeSirius
-from src.utils import get_backend, star_device_transpile
+from src.simulator import FakeFromBackend
+from src.utils import get_backend, get_configuration_dicts, star_device_transpile
 
 # TODO(TR): Refactor those settings.
 # There are 8 angles per layout in the job. This means the number of circuits in a single job is equal to
@@ -37,6 +37,7 @@ from src.utils import get_backend, star_device_transpile
 # number of circuits per job is 100 (on IQM Sirius).
 #
 
+SYSTEM_NAME: str = "sirius"
 N_JOBS_PER_LAYOUT: int = 3
 N_REPETITIONS: int = 10
 N_SHOTS: int = int(2e4)  # Max number of shots per circuit on IQM Sirius is 20000 (2e4).
@@ -252,17 +253,6 @@ def wait_and_save_results(jobs: list[Job], zip_file_name: str) -> None:
                 results_ready = False
 
 
-def save_calibration() -> None:
-    """
-    Save calibration data for the fake device. The fake device is not used in this function, but is only used to for
-    it's functionalities of saving the calibration data.
-
-    TODO(TR): Separate calibration saving from fake backends preparation.
-    """
-
-    FakeSirius(save_calibration=True)
-
-
 def noiseless_pipeline() -> None:
     """
     Execute a noiseless simulation pipeline using a quantum simulator backend.
@@ -306,9 +296,13 @@ def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
         :func:`find_best_qubit_layouts` for automatic layout selection.
         :func:`prepare_lg_jobs` for job preparation.
     """
+    print("Downloading configuration dicts...")
+    calibration_dict: dict[str, Any]
+    quality_dict: dict[str, Any]
+    calibration_dict, quality_dict = get_configuration_dicts(SYSTEM_NAME)
 
     print(f"{datetime.now()}: Preparing backend...")
-    backend: IQMFakeBackend = FakeSirius(save_calibration=True)
+    backend: IQMFakeBackend = FakeFromBackend(SYSTEM_NAME, calibration_dict, quality_dict)
     if len(qubits_lists) == 0:
         print(f"{datetime.now()}: Selecting best qubits list...")
         qubits_lists = find_best_qubit_layouts(backend)
@@ -337,10 +331,12 @@ def device_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
         :func:`find_best_qubit_layouts` for automatic layout selection.
         :func:`prepare_lg_jobs` for job preparation.
     """
+    print("Downloading configuration dicts...")
+    get_configuration_dicts(SYSTEM_NAME)  # Saves the system configuration during run.
 
     print(f"{datetime.now()}: Preparing backend...")
     backend: IQMBackend = get_backend()
-    save_calibration()
+
     if len(qubits_lists) == 0:
         print(f"{datetime.now()}: Selecting best qubits list...")
         qubits_lists = find_best_qubit_layouts(backend)
@@ -376,9 +372,12 @@ def pulla_pipeline(qubits_lists: list[list[int] | tuple[int, ...]], settings: Pu
         :func:`find_best_qubit_layouts` for automatic layout selection.
         :func:`execute_with_pulla` for the core execution logic with Pulla.
     """
+    print("Downloading configuration dicts...")
+    get_configuration_dicts(SYSTEM_NAME)  # Saves the system configuration during run.
+
     print(f"{datetime.now()}: Preparing backend...")
     backend: IQMBackend = get_backend()
-    save_calibration()
+
     if len(qubits_lists) == 0:
         print(f"{datetime.now()}: Selecting best qubits list...")
         qubits_lists = find_best_qubit_layouts(backend)

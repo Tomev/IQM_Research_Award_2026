@@ -3,6 +3,7 @@ Utility module for handling general-purpose handling of quantum devices and circ
 """
 
 import ast
+import json
 import os
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from qiskit import transpile
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 
 from src.jobs import LGACZ2
+from src.simulator import download_system_configuration_json
 
 N_REPETITIONS: int = 10
 NOW: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -144,3 +146,17 @@ def download_jobs(job_summaries: list[tuple[str, list[list[int]]]], backend: IQM
         jobs[-1].queued_job = backend.retrieve_job(job_summary[0])
 
     return jobs
+
+
+def get_configuration_dicts(system_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """TODO(TR): Docstring"""
+    cd_path, qd_path = download_system_configuration_json(system_name)
+
+    print("Get quality dict...")
+    with open(qd_path, "r") as f:
+        qd: dict = json.load(f)
+    print("Get calibration dict...")
+    with open(cd_path, "r") as f:
+        cd: dict = json.load(f)
+
+    return cd, qd
