@@ -6,6 +6,7 @@ import ast
 import json
 import os
 from datetime import datetime
+from typing import Any
 
 from iqm.qiskit_iqm import IQMBackend, transpile_to_IQM
 from iqm.qiskit_iqm.iqm_provider import IQMProvider
