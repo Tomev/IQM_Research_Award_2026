@@ -254,181 +254,281 @@
 	\begin{frame}{Motivation}
 		
 		\begin{itemize}
+			
 			\item Need for independent benchmarking tools
+			
 			\item With accordance to European Quantum Strategy
+			
 			\item The use of Star-topology devices in the advent of  Constellation-type devices
+			
 			\item ...
 		\end{itemize}
 	
 	\end{frame}
 
-	\begin{frame}{b}
+
+	\begin{frame}{Executive summary}
+		
 		Executive summary ( judging panel made up of Department Heads, Management, and VPs of Technology)
+		
+		
 		\begin{itemize}
 			\item What we did
 			\item Additional technical results (Star Device Qubit Selector, FakeSirius)
 		\end{itemize}
+	
 	\end{frame}
 	
+	
 	\begin{frame}{Projective vs weak measurement}
-		\vspace{-1cm}
+
+		\vspace{-0.4cm}
 		
 		\begin{columns}
-			\begin{column}{0.5\textwidth}
-			Projective (strong)
-				\begin{center}
-				\begin{tikzpicture}[scale=1]
-				\begin{yquant*}
-				qubit {} q[1];
-
-				init  {$\ket \psi$} q[0];
-				dmeter {$M$} q[0];
-				\end{yquant*}
-			\end{tikzpicture}
-			\end{center}
-			\begin{itemize}
-			\item Direct
-			\item Accurate (in theory)
-			\item Disturbing (decoherence)
-			\end{itemize}
-				
-			\end{column}
+			
 			
 			\begin{column}{0.5\textwidth}
-			Weak
-			\begin{center}
-				\begin{tikzpicture}[scale=1]
-				\begin{yquant*}
-				qubit {} q[3];
-				discard q[1,2];
-				% q[1];
-				init  {$\ket \psi$} q[0];
-				init {$\ket D$} q[2];
-				%
-				[shape=yquant-circle, radius=0mm]
-				box {} q[1] |  q[0],q[2];
-				hspace {-3mm} q[1];
-				text {$\theta\ll 1$} q[1];
-				dmeter {$M$} q[2];
-				\end{yquant*}
-			\end{tikzpicture}
-			\end{center}
-			\begin{itemize}
-			\item Indirect (weak coupling)
-			\item Inaccurate (deliberately)
-			\item small decoherence
-			\end{itemize}	
+				\begin{block}{Projective (strong) measurement}
 				
+					\begin{itemize}
+						\item Direct
+						\item Accurate (in theory)
+						\item Disturbing (decoherence)
+					\end{itemize}
+					\begin{center}
+						\begin{figure}[height=2cm]
+							\begin{tikzpicture}[scale=3]
+								\begin{yquant*}
+									qubit {} q[1];
+									init  {$\ket \psi$} q[0];
+									dmeter {$M$} q[0];
+								\end{yquant*}
+							\end{tikzpicture}
+						\end{figure}
+					\end{center}
+				\end{block}
 			\end{column}
+			
+			
+			\begin{column}{0.5\textwidth}
+				\begin{block}{Weak measurement}
+					\begin{itemize}
+						\item Indirect (weak coupling)
+						\item Inaccurate (deliberately)
+						\item Small decoherence
+					\end{itemize}
+					\begin{center}
+						\begin{tikzpicture}[scale=1]
+							\begin{yquant*}
+								qubit {} q[3];
+								discard q[1,2];
+								init  {$\ket \psi$} q[0];
+								init {$\ket D$} q[2];
+								[shape=yquant-circle, radius=0mm]
+								box {} q[1] |  q[0],q[2];
+								hspace {-3mm} q[1];
+								text {$\theta\ll 1$} q[1];
+								dmeter {$M$} q[2];
+							\end{yquant*}
+						\end{tikzpicture}
+					\end{center}	
+				\end{block}
+			\end{column}
+		
+		
 		\end{columns}
-	\bigskip
+
 	
-	No free lunch: information gain $>\theta$, decoherence $>\theta^2$.
+		\begin{alertblock}{No free lunch}
+			\begin{itemize}
+				\item Information gain $>\theta$
+				\item Decoherence $>\theta^2$
+			\end{itemize}
+		\end{alertblock}
+	
+	
+		\begin{alertblock}{The catch: Measurement strength $\theta$ calibration}
+			$a_{raw}=\theta a_{physical}$
+		\end{alertblock}
+	
+	
 	\end{frame}
 
 
 	\begin{frame}{Application: Leggett-Garg inequality violation}
-		\vspace{-1cm}
-	$$
-	\langle  a\rangle+\langle  b\rangle-\langle  a b\rangle\leq 1,\:|a|\leq 1,|b|\leq 1
-	$$
-	The catch: strength calibration  $\theta$: $a_{raw}=\theta a_{physical}$
-	\bigskip
+
+		\begin{block}{Leggett-Garg (LG) Inequality}
+		$$
+		\langle a \rangle + \langle b \rangle - \langle ab \rangle \leq 1, \:|a|\leq 1,|b|\leq 1
+		$$
+		\end{block}
+
 	
-	\begin{columns}
+		\begin{columns}
 			\begin{column}{0.5\textwidth}
-	\begin{itemize}
-\item Strength-agnostic form
-\item postselection $c=0,1$,
-\item  $A\equiv B$ (identical, independent)
-\end{itemize}
+				\begin{block}{LG-based benchmark inequality}
+					$$
+						Q = \frac{\braket{a}{c}\braket{b}{c}}{\braket{ab}{c}} \leq 1,
+					$$
+					where $\langle ab|c\rangle=\langle abc\rangle/p(c=1)$.
+					\begin{itemize}
+						\item measurement strength-agnostic
+						\item postselection $c=0,1$,
+						\item  $A\equiv B$ (identical, independent)
+					\end{itemize}
 	
-	$$
-	Q=\frac{\langle a+b|c\rangle^2}{4\langle ab|c\rangle}
-		\leq 1$$
-	$\langle ab|c\rangle=\langle abc\rangle/p(c=1)$
-		\end{column}
-		\begin{column}{0.5\textwidth}
-		\begin{tikzpicture}[scale=1]
-			\begin{yquant*}
-				qubit {} q[5];
-				discard q[0,1,2,3,4];
-				% q[1];
-				%init  q[0];
-				align q[0],q[2],q[4];
-				init {$C:\:\ket \psi$} q[2];
-				init {$A:\:\ket D$} q[0];
-				init {$B:\:\ket D$} q[4];
-				%
-				[shape=yquant-circle, radius=0mm]
-				box {} q[1] |  q[0],q[2];
-				hspace {-3mm} q[1];
-				text {$\theta$} q[1];
-				%
-				[shape=yquant-circle, radius=0mm]
-				box {} q[3] |  q[4],q[2];
-				hspace {-3mm} q[3];
-				text {$\theta$} q[3];
-				align q[0],q[2],q[4];
-				dmeter {$M$} q[0];
-				output {$a$} q[0];
-				dmeter {$C$} q[2];
-				output {$c$} q[2];
-				dmeter {$M$}  q[4];
-				output {$b$} q[4];
-			\end{yquant*}
-		\end{tikzpicture}
-		\end{column}
+				
+				\end{block}
+			\end{column}
+		
+			\begin{column}{0.5\textwidth}
+				\begin{center}
+					\begin{tikzpicture}[scale=1]
+						\begin{yquant*}
+							qubit {} q[5];
+							discard q[0,1,2,3,4];
+							% q[1];
+							%init  q[0];
+							align q[0],q[2],q[4];
+							init {$C:\:\ket \psi$} q[2];
+							init {$A:\:\ket D$} q[0];
+							init {$B:\:\ket D$} q[4];
+							%
+							[shape=yquant-circle, radius=0mm]
+							box {} q[1] |  q[0],q[2];
+							hspace {-3mm} q[1];
+							text {$\theta$} q[1];
+							%
+							[shape=yquant-circle, radius=0mm]
+							box {} q[3] |  q[4],q[2];
+							hspace {-3mm} q[3];
+							text {$\theta$} q[3];
+							align q[0],q[2],q[4];
+							dmeter {$M$} q[0];
+							output {$a$} q[0];
+							dmeter {$C$} q[2];
+							output {$c$} q[2];
+							dmeter {$M$}  q[4];
+							output {$b$} q[4];
+						\end{yquant*}
+					\end{tikzpicture}
+				\end{center}
+			\end{column}
+	
 		\end{columns}
+	
+		\begin{block}{Detectors identity and independence ($A \equiv B$)}
+			
+			Partially verifiable by $D = 0$, where $D := \langle a \rangle \langle bc \rangle - \langle b \rangle \langle ac \rangle $.
+			
+		\end{block}
+	
+	
 	\end{frame}
 
-	\begin{frame}{e}
-		Objective Reality: Description + formulas from LGA3
-	\end{frame}
+
 
 	\begin{frame}{A test with strength dependence on $\lambda=\sin\theta$}
-	$$A=B=Z=|0\rangle\langle 0|-|1\rangle\langle 1|,\:C=|\psi_-\rangle\langle\psi_-|,\: |\psi\rangle=|\psi_+\rangle$$
-	$$
-	|\psi_\pm\rangle=\cos\frac{\psi}{2}|1\rangle\pm\sin\frac{\psi}{2}|0\rangle
-	$$
-	\includegraphics[scale=.7]{figs/lgapar.pdf}
-	
-	
+		
+		\begin{columns}
+			
+			\begin{column}{0.4\textwidth}
+				\begin{block}{Setup}
+					$$A = B = Z = \ketbra{0} - \ketbra{1}$$
+					$$C = \ketbra{\psi_-} $$
+					$$\ket{\psi} = \ket{\psi_+}$$
+					$$
+					\ket{\psi_\pm} = \cos \frac{\psi}{2}\ket{1} \pm \sin \frac{\psi}{2}\ket{0}
+					$$
+				\end{block}
+			\end{column}
+			
+			
+			\begin{column}{0.6\textwidth}
+				\begin{figure} 
+					\includegraphics[scale=.7]{figs/lgapar.pdf}
+					\caption{Dependence of $Q$ on $\psi$.}
+				\end{figure} 
+			\end{column}
+		
+		
+		\end{columns}
+		
 		
 	\end{frame}
-	\begin{frame}{Weak coupling implementation}
-		\vspace{-1cm}
-		\begin{itemize}
-		\item	two qubit gate $U\sim I$, basis $|00\rangle$, $|01\rangle$, $|10\rangle$, $|11\rangle$
+	
+	
 		
-		\item	IBM/IonQ -- native
+	\begin{frame}{Weak coupling implementation}
+		\vspace{-0.2cm}
+		
+		\begin{columns}
+			
+			\begin{column}{0.6\textwidth}
+		
+				\begin{block}{Outline}
+					\begin{itemize}
+						\item Two qubit gate $U\sim I$
+						\item Basis: $\ket{00}, \ket{01}, \ket{10}, \ket{11}$
+					\end{itemize}	
+				\end{block}
+			
+				\begin{block}{Weak coupling with IQM-native gates}
+					
+					We use two $CZ$ gates sandwiching $Y_\theta$ gate.
+					
+					\begin{figure}	
+						\begin{tikzpicture}[scale=1]
+							\begin{yquant*}
+							qubit {} q[2];
+								init {} q[0];
+								init {} q[1];
+								box {$X_-$} q[1];
+								zz (q[0],q[1]);
+								box {$Y_\theta$} q[1];
+								zz (q[0],q[1]);
+								box {$X_+$} q[1];
+								\end{yquant*}
+							\end{tikzpicture}
+					\end{figure}
+				\end{block}
+
+		
+	
+			\end{column}
+		
+			\begin{column}{0.3\textwidth}
+				\begin{block}{Notation}
+					$ X = \ketbra{0}{1} + \ketbra{1}{0}$
+					$ Y = i \ketbra{1}{0} - i \ketbra{0}{1}$
+					$ V_\theta = \exp(-i\theta V)$
+					$ V_\pm = V_{\pm\pi/2}$		
+				\end{block}
+			\end{column}
+			
+		
+		\end{columns}
+	
+		\begin{block}{Alternative: Fractional gates}
+			
+			Weak coupling implementation is native on IBM / IonQ devices with
+			the fractional RZZ gate.
 			
 			$$
-			RZZ(\theta)=\mathrm{diag}(1,e^{i\theta},e^{i\theta},1)
+				RZZ(\theta) = \mathrm{diag}(1, e^{i\theta}, e^{i\theta}, 1)
 			$$
-		\item IQM -- two CZ sandwiching $Y_\theta$
-		\bigskip
+			
+		\end{block}
 		
-		\begin{tikzpicture}[scale=1]
-			\begin{yquant*}
-			qubit {} q[2];
-				init {} q[0];
-				init {} q[1];
-				box {$X_-$} q[1];
-				zz (q[0],q[1]);
-				box {$Y_\theta$} q[1];
-				zz (q[0],q[1]);
-				box {$X_+$} q[1];
-				\end{yquant*}
-			\end{tikzpicture}
-
-		\end{itemize}
-			Notation: $X=|0\rangle\langle 1|+|1\rangle\langle 0|$, $Y=i|1\rangle\langle 0-i|0\rangle\langle 1|$,
-			$V_\theta=\exp(-i\theta V)$, $V_\pm=V_{\pm\pi/2}$
 	\end{frame}
 
+
+
+
+
+
 	\begin{frame}{e}
-		Objective Reality Results
+		Detectors independence results
 	\end{frame}
 	
 	\begin{frame}{Results on IBM/IonQ/IQM $\theta=0.1$}
@@ -468,6 +568,7 @@
 			continuous families of entangling gates
 		\item avoid postselection (full noninvasiveness)
 		\item Star topology $\to$ scale up the test, more detectors
+		\item TODO(TR): CZ protocol works better!
 		\end{itemize}
 		
 		Benefits		
@@ -493,16 +594,18 @@
 	https://github.com/Tomev/IQM\_Research\_Award\_2026
 	\bigskip
 
-		Last but not least!
+		\textbf{Last but not least! Thanks to: }
 		\begin{itemize}
-		\item our long-standing collaborators/supporters: Wolfgang Belzig, Jakub Tworzyd{\l}o, and Josep Batle
-		\item to read more https://arxiv.org/abs/2603.22020
-		\item IBM Quantum, IonQ, IQM -- access provided
-		\item  Pozna{\'n} Supercomputing and Networking Center -- Polish access hub
-		\item funding "{}Excellence
-		initiative -- research university"{} for the AGH University in Krakow as well as the
-		ARTIQ project: UMO-2021/01/2/ST6/00004 and ARTIQ/0004/2021.
+			
+			\item our long-standing collaborators/supporters: Wolfgang Belzig, Jakub Tworzyd{\l}o, and Josep Batle
+			\item IBM Quantum, IonQ, IQM -- access provided
+			\item  Pozna{\'n} Supercomputing and Networking Center -- Polish access hub
+			\item funding "{}Excellence
+			initiative -- research university"{} for the AGH University in Krakow as well as the
+			ARTIQ project: UMO-2021/01/2/ST6/00004 and ARTIQ/0004/2021.
+			
 		\end{itemize}
+	
 	\end{frame}
 
 
