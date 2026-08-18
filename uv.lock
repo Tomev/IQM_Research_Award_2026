@@ -386,6 +386,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/37/c7/3ba6d2e6d7c4e0fb6af61b369cfdac652a6e0deb960ad44b261fac1ba433/iqm_pulla-14.0.0-py3-none-any.whl", hash = "sha256:ea7a8cc2c75263bdb065d30c498070ca832024dc8c4f73bc21d5e721b55bcfcf", size = 155320, upload-time = "2026-07-23T06:45:28.083Z" },
 ]
 
+[package.optional-dependencies]
+qiskit = [
+    { name = "iqm-client", extra = ["qiskit"] },
+]
+
 [[package]]
 name = "iqm-pulse"
 version = "14.0.0"
@@ -428,6 +433,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "iqm-client", extra = ["qiskit"] },
+    { name = "iqm-pulla", extra = ["qiskit"] },
     { name = "iqm-qubit-selector" },
     { name = "matplotlib" },
 ]
@@ -435,6 +441,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "iqm-client", extras = ["qiskit"], specifier = ">=35.0.0" },
+    { name = "iqm-pulla", extras = ["qiskit"], specifier = ">=14.0.0" },
     { name = "iqm-qubit-selector", specifier = ">=1.1.0" },
     { name = "matplotlib", specifier = ">=3.11.1" },
 ]

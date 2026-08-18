@@ -1,15 +1,19 @@
 """ """
 
+import json
 import time
 from datetime import datetime
+from typing import Any
 
 import pandas as pd
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from src.jobs import LGACZ2, Job
-from src.simulator import FakeSirius
+from src.simulator import FakeFromBackend
+from src.utils import get_configuration_dicts
 
 # TODO(TR): Refactor those settings.
+SYSTEM_NAME: str = "sirius"
 N_JOBS: int = 4
 N_REPETITIONS: int = 4
 N_SHOTS: int = 1024
@@ -35,9 +39,8 @@ def run_scripts():
     i: int = 0
     job_list_path = f"{RESULTS_FOLDER_NAME}/{RESULTS_FILE_NAME}"
 
-    # backend = IQMFakeDeneb()
-    print(f"{datetime.now()}: Preparing FakeSirius")
-    backend = FakeSirius()
+    print(f"{datetime.now()}: Downloading backend configuration data")
+    
 
     while i < N_JOBS:
         print(f"{datetime.now()}: Starting service")

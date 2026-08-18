@@ -10,7 +10,7 @@ system.
 import os
 from collections import defaultdict
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from iqm.iqm_client import IQMClient, StaticQuantumArchitecture
 from iqm.qiskit_iqm import IQMBackend, IQMProvider
@@ -81,7 +81,9 @@ def get_coupling_map(backend: IQMBackend) -> list[tuple[str, str]]:
     return coupling_map
 
 
-def get_error_profile(system_name: str, save_calibration: bool) -> IQMErrorProfile:
+def get_error_profile(
+    system_name: str, calibration_dict: dict[str, Any], quality_dict: dict[str, Any]
+) -> IQMErrorProfile:
     """Returns the error profile for the given system.
 
     This function retrieves the error profile parameters, from the IQM server using the specified system name. It
@@ -90,15 +92,11 @@ def get_error_profile(system_name: str, save_calibration: bool) -> IQMErrorProfi
 
     Args:
         system_name: The name of the quantum system for which the error profile is to be retrieved.
-        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+        TODO(TR): Args...
 
     Returns:
         IQMErrorProfile: The error profile for the given system.
     """
-    calibration_set: ObservationSetWithObservations
-    quality_metric_set: ObservationSetWithObservations
-
-    calibration_set, quality_metric_set = get_calibration_data(system_name, save_calibration)
 
     backend: IQMBackend = IQMProvider(
         os.environ["IQM_PROVIDER"],
@@ -107,62 +105,24 @@ def get_error_profile(system_name: str, save_calibration: bool) -> IQMErrorProfi
 
     backend_gates: dict[str, list[str]] = get_gates(backend)
 
-    t1: dict[str, float] = get_ts(quality_metric_set, "t1_time")
+    t1: dict[str, float] = get_ts(quality_dict, "t1_time")
 
     return IQMErrorProfile(
         t1s=t1,
-        t2s=ensure_t2_correct(t1, get_ts(quality_metric_set, "t2_time")),
+        t2s=ensure_t2_correct(t1, get_ts(quality_dict, "t2_time")),
         single_qubit_gate_depolarizing_error_parameters=compute_single_qubit_gates_depolarizing_error_parameters(
-            quality_metric_set, backend_gates["1q"]
+            quality_dict, backend_gates["1q"]
         ),
         two_qubit_gate_depolarizing_error_parameters=compute_two_qubit_gates_depolarizing_error_parameters(
-            quality_metric_set, backend_gates["2q"]
+            quality_dict, backend_gates["2q"]
         ),
-        single_qubit_gate_durations=get_gates_duration(calibration_set, backend_gates["1q"]),
-        two_qubit_gate_durations=get_gates_duration(calibration_set, backend_gates["2q"]),
-        readout_errors=get_readout_errors(quality_metric_set),
+        single_qubit_gate_durations=get_gates_duration(calibration_dict, backend_gates["1q"]),
+        two_qubit_gate_durations=get_gates_duration(calibration_dict, backend_gates["2q"]),
+        readout_errors=get_readout_errors(quality_dict),
     )
 
 
-def get_calibration_data(
-    system_name: str, save_calibration: bool
-) -> tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
-    """Retrieves calibration and quality metric data for the specified system.
-
-    This function connects to the IQM server and retrieves the calibration set and quality metric set for the specified
-    quantum system. If `save_calibration` is set to True, the data is saved in JSON format with timestamps to
-    ensure unique filenames.
-
-    Args:
-        system_name: The name of the quantum system for which data is to be retrieved.
-        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
-
-    Returns:
-        tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
-            A tuple containing the calibration set and quality metric set for the system.
-    """
-    client: IQMClient = IQMClient(
-        iqm_server_url=os.environ["IQM_PROVIDER"],
-        quantum_computer=system_name,
-    )
-
-    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
-    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
-        calibration_set.observation_set_id
-    )
-
-    if save_calibration:
-        now: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        with open(f"{now}_{system_name}_calibration.json", "w") as f:
-            f.write(calibration_set.model_dump_json())
-
-        with open(f"{now}_{system_name}_quality.json", "w") as f:
-            f.write(quality_metric_set.model_dump_json())
-
-    return calibration_set, quality_metric_set
-
-
-def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeType) -> dict[str, float]:
+def get_ts(quality_dict: dict[str, Any], time_type: TimeType) -> dict[str, float]:
     """Returns the T1 or T2 times for each component (qubit / resonator) from the quality metric set.
 
     This function processes the observations in the quality metric set and extracts the T1 or T2 times based on the
@@ -170,8 +130,8 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
     nanoseconds, as expected by the `IQMErrorProfile`.
 
     Args:
-        quality_metric_set:
-            The set of observations containing quality metrics.
+        quality_dict:
+            A `dict` containing quality metrics.
         time_type:
             The type of time to extract, either "t1_time" or "t2_time".
 
@@ -180,10 +140,10 @@ def get_ts(quality_metric_set: ObservationSetWithObservations, time_type: TimeTy
     """
     ts: dict[str, float] = {}
 
-    for observation in quality_metric_set.observations:
-        if time_type in observation.dut_field:
-            component_name: str = observation.dut_field.split(".")[-2]
-            ts[component_name] = observation.value * 1e9  # seconds to nano seconds
+    for observation in quality_dict["observations"]:
+        if time_type in observation["dut_field"]:
+            component_name: str = observation["dut_field"].split(".")[-2]
+            ts[component_name] = observation["value"] * 1e9  # seconds to nano seconds
 
     return ts
 
@@ -234,12 +194,14 @@ def get_gates(backend: IQMBackend) -> dict[str, list[str]]:
 
 
 def compute_single_qubit_gates_depolarizing_error_parameters(
-    quality_metric_set: ObservationSetWithObservations, gates: list[str]
+    quality_dict: dict[str, Any], gates: list[str]
 ) -> dict[str, dict[str, float]]:
     """Computes depolarizing error parameters for single-qubit gates.
 
     This function calculates the depolarizing error parameter for each single-qubit gate based on the fidelity values
     obtained from the quality metric set of observations.
+
+    TODO(TR): Args...
 
     .. note::
         Depolarizing error parameter can be obtained from the fidelity. In the case of 1-qubit gates it's given by
@@ -252,26 +214,28 @@ def compute_single_qubit_gates_depolarizing_error_parameters(
     """
     depolarizing_error_parameters: dict[str, dict[str, float]] = defaultdict(lambda: {})
 
-    for observation in quality_metric_set.observations:
-        if ".fidelity" in observation.dut_field:
-            gate_name: str = observation.dut_field.split(".")[2]
+    for observation in quality_dict["observations"]:
+        if ".fidelity" in observation["dut_field"]:
+            gate_name: str = observation["dut_field"].split(".")[2]
 
             if gate_name not in gates:  # Omit the gates that are of no interest to us.
                 continue
 
-            component_name: str = observation.dut_field.split(".")[-2]
-            depolarizing_error_parameters[gate_name][component_name] = 2 * (1 - observation.value)
+            component_name: str = observation["dut_field"].split(".")[-2]
+            depolarizing_error_parameters[gate_name][component_name] = 2 * (1 - observation["value"])
 
     return depolarizing_error_parameters
 
 
 def compute_two_qubit_gates_depolarizing_error_parameters(
-    quality_metric_set: ObservationSetWithObservations, gates: list[str]
+    quality_dict: dict[str, Any], gates: list[str]
 ) -> dict[str, dict[tuple[str, str], float]]:
     """Computes depolarizing error parameters for two-qubit gates.
 
     This function calculates the depolarizing error parameter for each two-qubit gate based on the fidelity values
     obtained from the quality metric set of observations.
+
+    TODO(TR): Args...
 
     .. note::
         Depolarizing error parameter can be obtained from the fidelity. In the case of 2-qubit gates it's given by
@@ -285,26 +249,28 @@ def compute_two_qubit_gates_depolarizing_error_parameters(
 
     depolarizing_error_parameters: dict[str, dict[tuple[str, str], float]] = defaultdict(lambda: {})
 
-    for observation in quality_metric_set.observations:
-        if ".fidelity" in observation.dut_field:
-            gate_name: str = observation.dut_field.split(".")[2]
+    for observation in quality_dict["observations"]:
+        if ".fidelity" in observation["dut_field"]:
+            gate_name: str = observation["dut_field"].split(".")[2]
 
             if gate_name not in gates:  # Omit the gates that are of no interest to us.
                 continue
 
-            operation_components: list[str] = observation.dut_field.split(".")[-2].split("__")
+            operation_components: list[str] = observation["dut_field"].split(".")[-2].split("__")
             inner_key: tuple[str, str] = (operation_components[0], operation_components[1])
-            depolarizing_error_parameters[gate_name][inner_key] = 4 / 3 * (1 - observation.value)
+            depolarizing_error_parameters[gate_name][inner_key] = 4 / 3 * (1 - observation["value"])
 
     return depolarizing_error_parameters
 
 
-def get_gates_duration(calibration_set: ObservationSetWithObservations, gates: list[str]) -> dict[str, float]:
+def get_gates_duration(calibration_dict: dict[str, Any], gates: list[str]) -> dict[str, float]:
     """Returns the average gate durations in nanoseconds for each gate type.
 
     This function processes the calibration set observations to extract the durations of single-qubit and two-qubit
     gates. For each gate type, it computes the average duration across all qubits or qubit pairs and returns the
     result in nanoseconds.
+
+    TODO(TR): Args...
 
     .. note::
         In `FakeVLQ` gate duration is a single number. In publicly defined IQM devices, the durations are defined for
@@ -313,21 +279,19 @@ def get_gates_duration(calibration_set: ObservationSetWithObservations, gates: l
     """
     gates_duration: dict[str, list[float]] = defaultdict(lambda: [])
 
-    for observation in calibration_set.observations:
-        if "duration" in observation.dut_field:
-            gate_name: str = observation.dut_field.split(".")[1]
+    for observation in calibration_dict["observations"]:
+        if "duration" in observation["dut_field"]:
+            gate_name: str = observation["dut_field"].split(".")[1]
 
             if gate_name not in gates:  # Skip gates that are of no interest.
                 continue
 
-            gates_duration[gate_name].append(observation.value)
+            gates_duration[gate_name].append(observation["value"])
 
     return {k: average(v) * 1e9 for k, v in gates_duration.items()}  # convert seconds to nano seconds
 
 
-def get_readout_errors(
-    quality_metric_set: ObservationSetWithObservations,
-) -> dict[str, dict[str, float]]:
+def get_readout_errors(quality_dict: dict[str, Any]) -> dict[str, dict[str, float]]:
     """Returns the readout error probabilities for each component (qubit / resonator).
 
     This function processes the observations in the quality metric set and extracts the readout error probabilities
@@ -335,8 +299,8 @@ def get_readout_errors(
     both :math:`|0\\rangle \\rightarrow |1\\rangle` and :math:`|1\\rangle \\rightarrow |0\\rangle` transitions.
 
     Args:
-        quality_metric_set:
-            The set of observations containing quality metrics.
+        quality_dict:
+            A dict containing quality metrics.
 
     Returns:
         dict[str, dict[str, float]]: A dictionary mapping component names to their corresponding readout error
@@ -344,20 +308,68 @@ def get_readout_errors(
         and "1" for :math:`|1\\rangle \\rightarrow |0\\rangle` transitions.
     """
     readout_errors: dict[str, dict[str, float]] = defaultdict(lambda: {})
+    component_name: str
 
-    for observation in quality_metric_set.observations:
-        if "error_0_to_1" in observation.dut_field:
-            component_name: str = observation.dut_field.split(".")[-2]
-            readout_errors[component_name]["0"] = observation.value
+    for observation in quality_dict["observations"]:
+        if "error_0_to_1" in observation["dut_field"]:
+            component_name = observation["dut_field"].split(".")[-2]
+            readout_errors[component_name]["0"] = observation["value"]
 
-        if "error_1_to_0" in observation.dut_field:
-            component_name: str = observation.dut_field.split(".")[-2]
-            readout_errors[component_name]["1"] = observation.value
+        if "error_1_to_0" in observation["dut_field"]:
+            component_name = observation["dut_field"].split(".")[-2]
+            readout_errors[component_name]["1"] = observation["value"]
 
     return readout_errors
 
 
-def FakeFromBackend(system_name: str, save_calibration: bool = False) -> IQMFakeBackend:
+def get_configuration_data(system_name: str) -> tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
+    """Retrieves calibration and quality metric data for the specified system.
+
+    This function connects to the IQM server and retrieves the calibration set and quality metric set for the specified
+    quantum system. If `save_calibration` is set to True, the data is saved in JSON format with timestamps to
+    ensure unique filenames.
+
+    Args:
+        system_name: The name of the quantum system for which data is to be retrieved.
+        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+
+    Returns:
+        tuple[ObservationSetWithObservations, ObservationSetWithObservations]:
+            A tuple containing the calibration set and quality metric set for the system.
+    """
+    client: IQMClient = IQMClient(
+        iqm_server_url=os.environ["IQM_PROVIDER"],
+        quantum_computer=system_name,
+    )
+
+    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
+    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
+        calibration_set.observation_set_id
+    )
+
+    return calibration_set, quality_metric_set
+
+
+def download_system_configuration_json(system_name: str) -> tuple[str, str]:
+    """TODO(TR): Docstring"""
+    calibration_set: ObservationSetWithObservations
+    quality_metric_set: ObservationSetWithObservations
+    calibration_set, quality_metric_set = get_configuration_data(system_name)
+
+    now: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    calibration_json_path: str = f"{now}_{system_name}_calibration.json"
+    quality_json_path: str = f"{now}_{system_name}_quality.json"
+
+    with open(calibration_json_path, "w") as f:
+        f.write(calibration_set.model_dump_json())
+
+    with open(quality_json_path, "w") as f:
+        f.write(quality_metric_set.model_dump_json())
+
+    return calibration_json_path, quality_json_path
+
+
+def FakeFromBackend(system_name: str, calibration_dict: dict[str, Any], quality_dict: dict[str, Any]) -> IQMFakeBackend:
     """Creates a fake IQM backend simulator for the specified system.
 
     This function constructs an :class:`IQMFakeBackend` object using the static quantum architecture and error profile
@@ -366,7 +378,7 @@ def FakeFromBackend(system_name: str, save_calibration: bool = False) -> IQMFake
 
     Args:
         system_name: The name of the quantum system for which the fake backend is to be created.
-        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+        TODO(TR): Args...
 
     Returns:
         IQMFakeBackend: A fake backend simulator for the specified system.
@@ -374,23 +386,22 @@ def FakeFromBackend(system_name: str, save_calibration: bool = False) -> IQMFake
 
     return IQMFakeBackend(
         get_architecture(system_name),
-        get_error_profile(system_name, save_calibration),
+        get_error_profile(system_name, calibration_dict, quality_dict),
         # name=f"Fake{system_name.capitalize()}",
         name=system_name,  # Keep the original name, so that we can use this FakeBackend in IQMStarCostEvaluator
     )
 
 
-def FakeSirius(save_calibration: bool = False) -> IQMFakeBackend:
+def FakeSirius(calibration_dict: dict[str, Any], quality_dict: dict[str, Any]) -> IQMFakeBackend:
     """Creates a fake IQM backend simulator for the Sirius quantum system.
 
     This function constructs an :class:`IQMFakeBackend` object using the static quantum architecture and error profile
     specific to the `sirius` system. The resulting backend can be used for simulations that mimic the behavior of the
     real IQM `sirius` quantum computer.
 
-    Args:
-        save_calibration: A boolean indicating whether to save the retrieved calibration data to files.
+    TODO(TR): Args...
 
     Returns:
         IQMFakeBackend: A fake backend simulator for the `sirius` system.
     """
-    return FakeFromBackend("sirius", save_calibration)
+    return FakeFromBackend("sirius", calibration_dict, quality_dict)

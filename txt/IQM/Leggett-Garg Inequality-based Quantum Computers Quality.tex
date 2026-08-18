@@ -1,0 +1,471 @@
+\documentclass{beamer}
+
+\usetheme{Frankfurt}
+%\usetheme{Warsaw}
+
+%\usepackage{ragged2e}
+\usepackage{graphicx}
+
+\usepackage[justification=centering]{caption}
+
+\usepackage{rotating}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{yquant}
+\useyquantlanguage{groups}
+\usetikzlibrary{fit, quotes}
+\usetikzlibrary{snakes,arrows,shapes}
+
+\usepackage{graphicx}
+
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{physics}
+\def\be#1\ee{\begin{equation}#1\end{equation}}
+
+\usepackage[utf8]{inputenc}
+
+\usepackage{color}
+%\usepackage[dvipsnames]{xcolor}
+
+\renewcommand{\mark}			{{\bf Oznaczenie: \\}}
+\renewcommand{\det}[1]			{det \left( #1 \right)}
+\renewcommand{\ker}[1]			{ker \left( #1 \right)}
+\renewcommand{\limits}[1]		{\left. #1 \right|}
+\renewcommand{\d}				{\delta}
+\newcommand{\tg}[2]			{tg^{#1}\parenthesis{#2}}
+\newcommand{\ctg}[2]			{ctg^{#1}\parenthesis{#2}}
+
+\newcommand{\im}[1]				{Im \left( #1 \right)}
+\newcommand{\task}[1]			{{\bf Zadanie #1.}\\}
+\newcommand{\observation} 		{{\bf Obserwacja:}\\}
+\newcommand{\property}[1] 		{{\bf Wlasnosci } #1 :\\ }
+\newcommand{\theoremName}[1]	{{\bf Twierdzenie (#1):}}
+\newcommand{\conclusion}		{{\bf Wniosek:}}
+\newcommand{\remark}			{{\bf Uwaga:\\}}
+\newcommand{\question}			{{\bf Pytanie:\\}}
+\newcommand{\mb}[1] 			{\mathbb{#1}}
+\newcommand{\mc}[1]				{\mathcal{#1}}
+\newcommand{\ilim}[1]			{lim_{#1 \to \infty}}
+\newcommand{\zlim}[1]			{lim_{#1 \to 0}}
+\newcommand{\pdiv}[2]			{\frac{\partial #1}{\partial #2}}
+\newcommand{\dive}[2]			{\frac{d #1}{d #2}}
+\newcommand{\pdivpt}[3]			{\left. \frac{\partial #1}{\partial #2} \right|_{#3}}
+\newcommand{\ndimfunc}[1]		{\left\{ 
+	\begin{array}{ll}
+		#1
+	\end{array}
+	\right.}
+\newcommand{\colvec}[1]			{\left[
+	\begin{array}{c}
+		#1
+	\end{array}
+	\right]}
+\newcommand{\rowvec}[1]			{\left[
+	#1
+	\right]}
+\newcommand{\cmatrix}[2]		{\left[
+	\begin{array}{#1}
+		#2
+	\end{array}
+	\right]}
+\newcommand{\parenthesis}[1]	{\left( #1 \right)}
+\newcommand{\brackets}[1]		{\left\{ #1 \right\}}
+\newcommand{\linSys}[1]			{
+	\left\{ 
+	\begin{array}{l}
+		#1
+	\end{array} 
+	\right.
+}
+\newcommand{\e}					{\epsilon}
+\renewcommand{\d}				{\delta}
+\renewcommand{\a}				{\alpha}
+\renewcommand{\b}				{\beta}
+\newcommand{\lin}[1]			{\left< #1 \right>}
+\newcommand{\sprod}[2]			{\left< \left. #1 \right| #2 \right> }
+\newcommand{\x}					{\times}
+\newcommand{\subs}[1]			{
+	\left/ \left/
+	\begin{array}{l}
+		#1
+	\end{array}
+	\right/ \right/
+}
+\newcommand{\ver}[1]			{\hat{e}_{#1}}
+\newcommand{\p}[1]				{\partial_{#1}}
+\newcommand{\tdiv}				{\frac{d}{dt}}
+
+\newcommand\blfootnote[1]{%
+  \begingroup
+  \renewcommand\thefootnote{}\footnote{#1}%
+  \addtocounter{footnote}{-1}%
+  \endgroup
+}
+
+\usepackage{physics}
+
+\newcommand{\gcm}{{\color{OliveGreen} \checkmark}}
+\newcommand{\rx}{{\color{red} $\times$}}
+
+% Define custom colors
+\definecolor{codeblue}{rgb}{0.25,0.5,0.75}
+\definecolor{backgray}{rgb}{0.95,0.95,0.95}
+
+\usepackage{listings}
+% Python code style
+\lstdefinestyle{pythonstyle}{
+	language=Python,                 % Use Python language
+	backgroundcolor=\color{backgray}, % Set background color
+	commentstyle=\color{OliveGreen},       % Comments in green
+	keywordstyle=\color{blue},        % Keywords in blue
+	stringstyle=\color{codeblue},     % Strings in light blue
+	basicstyle=\ttfamily\footnotesize,% Basic font style
+	frame=single,                     % Frame the code
+	breaklines=true,                  % Allow breaking lines
+	numbers=left,                     % Line numbers on the left
+	numberstyle=\tiny\color{gray},    % Line number style
+	tabsize=4,                        % Set tab size to 4 spaces
+	showstringspaces=false,            % Do not show spaces in strings
+	morekeywords = {QMLModel, ModelFinder}
+}
+\lstset{style=pythonstyle}
+
+
+
+
+
+\usepackage{amsmath,epsfig,mathrsfs,graphicx,amssymb,color,float}
+\usepackage[T1]{fontenc}
+\usepackage{t1enc}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{ulem}
+
+\newcommand{\h}[1]{\hat{ #1}}
+\newcommand{\f}[2]{\frac {#1}{#2}}
+\def\e{\boldsymbol e}
+\def\p{\partial}
+\newcommand{\g}[1]{{\boldsymbol #1}}
+\def\rmd{\mathrm d}
+\def\rmi{\mathrm i}
+\def\rme{\mathrm e}
+\def\be#1\ee{\begin{equation}#1\end{equation}}
+\newcommand{\ba}{\begin{eqnarray} }
+	\newcommand{\ea}{\end{eqnarray} }
+\def\cor#1{{\color{red}#1}}
+\def\kor#1{{\color{blue}#1}}
+
+
+
+\usepackage{amsmath,epsfig,mathrsfs,graphicx,amssymb,color,float}
+\usepackage[T1]{fontenc}
+\usepackage{t1enc}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{ulem}
+
+
+\def\e{\boldsymbol e}
+\def\p{\partial}
+\def\rmd{\mathrm d}
+\def\rmi{\mathrm i}
+\def\rme{\mathrm e}
+\def\be#1\ee{\begin{equation}#1\end{equation}}
+\def\cor#1{{\color{red}#1}}
+\def\kor#1{{\color{blue}#1}}
+
+
+
+%PAKIETY
+%\usepackage[cp1250]{inputenc}   % pozwala wprowadzaĂ?Â?Ă‚Â„Ă?Â˘Ă‚Â€Ă‚Âˇ polskie znaki bezpoĂ?Â„Ă‚ÂąĂ?Â˘Ă‚Â€Ă‚Âşrednio z klawiatury
+\usepackage{amsmath}            % AMS-LaTeX (AMS-Math)
+\usepackage{amsfonts}           % ekstra fonty matematyczne
+\usepackage{amssymb}            % ekstra symbole matematyczne
+%\usepackage{a4wide}             % szersza kolumna tekstu niĂ?Â„Ă‚ÂąĂ?Â„Ă‚Â˝ domyĂ?Â„Ă‚ÂąĂ?Â˘Ă‚Â€Ă‚Âşlnie
+\usepackage{enumerate,graphicx}
+%\usepackage{multicol}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{bbm}
+\usepackage{physics}
+
+%PAKIETY
+%\usepackage{polski}             % spolszczenie LaTeXa
+%\usepackage[utf8]{inputenc}   % pozwala wprowadzaĂ?Â¦ polskie znaki bezpoĂ‚Âśrednio z klawiatury
+\usepackage{amsmath}            % AMS-LaTeX (AMS-Math)
+\usepackage{amsfonts}           % ekstra fonty matematyczne
+\usepackage{amssymb}            % ekstra symbole matematyczne
+% szersza kolumna tekstu niĂ‚Âż domyĂ‚Âślnie
+\usepackage{enumerate,graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{yquant}
+\usetikzlibrary{fit, quotes}
+\usetikzlibrary{snakes,arrows,shapes}
+\useyquantlanguage{groups}
+\usepackage{physics}
+\usepackage{todonotes}
+\newtheorem{thm}{Theorem}
+
+
+
+
+
+\setbeamersize{text margin left=5mm,text margin right=5mm} 
+
+\def\arraystretch{1.5} % Rozciąga wysokość tablicy
+
+\setbeamertemplate{navigation symbols}{} % remove navigation symbols
+\setbeamertemplate{footline}[frame number]
+
+\title[\tiny LGI-based benchmark]{Leggett-Garg Inequality-based Quantum Computers Quality Benchmark}
+
+\author[Tomek Rybotycki, Adam Bednorz]{\textbf{Tomek Rybotycki}, \textbf{Adam Bednorz}}
+\institute[SRI PAS]{
+	Systems Research Institute, Polish Academy of Sciences\\
+	Nicolaus Copernicus Astronomical Center, Polish Academy of Sciences\\
+	Center of Excellence in Artificial Intelligence, AGH University of Cracow\\
+	Faculty of Physics, University of Warsaw
+}
+
+\date{
+	IQM Awards 2026 Talk\\
+	6 VIII 2026, Online
+}
+%\logo{
+%	\includegraphics[height=1cm]{figs/logos/ibs_pan_CMYK.pdf}%
+% 	\includegraphics[height=1cm]{figs/logos/camk.pdf}
+% 	\includegraphics[height=1cm]{figs/logos/ceai-logo-icon.png}
+% 	\includegraphics[height=1cm]{figs/logos/EN_zwykly_okragly.png}
+% 	% TODO: ADD FUW LOGO
+% }
+
+
+\begin{document}
+	
+	%\justifying
+	
+	\frame{\titlepage}
+	
+	\begin{frame}{Projective vs weak measurement}
+		\vspace{-1cm}
+		
+		\begin{columns}
+			\begin{column}{0.5\textwidth}
+			Projective (strong)
+				\begin{center}
+				\begin{tikzpicture}[scale=1]
+				\begin{yquant*}
+				qubit {} q[1];
+
+				init  {$\ket \psi$} q[0];
+				dmeter {$M$} q[0];
+				\end{yquant*}
+			\end{tikzpicture}
+			\end{center}
+			\begin{itemize}
+			\item Direct
+			\item Accurate (in theory)
+			\item Disturbing (decoherence)
+			\end{itemize}
+				
+			\end{column}
+			
+			\begin{column}{0.5\textwidth}
+			Weak
+			\begin{center}
+				\begin{tikzpicture}[scale=1]
+				\begin{yquant*}
+				qubit {} q[3];
+				discard q[1,2];
+				% q[1];
+				init  {$\ket \psi$} q[0];
+				init {$\ket D$} q[2];
+				%
+				[shape=yquant-circle, radius=0mm]
+				box {} q[1] |  q[0],q[2];
+				hspace {-3mm} q[1];
+				text {$\theta\ll 1$} q[1];
+				dmeter {$M$} q[2];
+				\end{yquant*}
+			\end{tikzpicture}
+			\end{center}
+			\begin{itemize}
+			\item Indirect (weak coupling)
+			\item Inaccurate (deliberately)
+			\item small decoherence
+			\end{itemize}	
+				
+			\end{column}
+		\end{columns}
+	\bigskip
+	
+	No free lunch: information gain $>\theta$, decoherence $>\theta^2$.
+	\end{frame}
+
+
+	\begin{frame}{Application: Leggett-Garg inequality violation}
+		\vspace{-1cm}
+	$$
+	\langle  a\rangle+\langle  b\rangle-\langle  a b\rangle\leq 1,\:|a|\leq 1,|b|\leq 1
+	$$
+	The catch: strength calibration  $\theta$: $a_{raw}=\theta a_{physical}$
+	\bigskip
+	
+	\begin{columns}
+			\begin{column}{0.5\textwidth}
+	\begin{itemize}
+\item Strength-agnostic form
+\item postselection $c=0,1$,
+\item  $A\equiv B$ (identical, independent)
+\end{itemize}
+	
+	$$
+	Q=\frac{\langle a+b|c\rangle^2}{4\langle ab|c\rangle}
+		\leq 1$$
+	$\langle ab|c\rangle=\langle abc\rangle/p(c=1)$
+		\end{column}
+		\begin{column}{0.5\textwidth}
+		\begin{tikzpicture}[scale=1]
+			\begin{yquant*}
+				qubit {} q[5];
+				discard q[0,1,2,3,4];
+				% q[1];
+				%init  q[0];
+				align q[0],q[2],q[4];
+				init {$C:\:\ket \psi$} q[2];
+				init {$A:\:\ket D$} q[0];
+				init {$B:\:\ket D$} q[4];
+				%
+				[shape=yquant-circle, radius=0mm]
+				box {} q[1] |  q[0],q[2];
+				hspace {-3mm} q[1];
+				text {$\theta$} q[1];
+				%
+				[shape=yquant-circle, radius=0mm]
+				box {} q[3] |  q[4],q[2];
+				hspace {-3mm} q[3];
+				text {$\theta$} q[3];
+				align q[0],q[2],q[4];
+				dmeter {$M$} q[0];
+				output {$a$} q[0];
+				dmeter {$C$} q[2];
+				output {$c$} q[2];
+				dmeter {$M$}  q[4];
+				output {$b$} q[4];
+			\end{yquant*}
+		\end{tikzpicture}
+		\end{column}
+		\end{columns}
+	\end{frame}
+
+	\begin{frame}{A test with strength dependence on $\lambda=\sin\theta$}
+	$$A=B=Z=|0\rangle\langle 0|-|1\rangle\langle 1|,\:C=|\psi_-\rangle\langle\psi_-|,\: |\psi\rangle=|\psi_+\rangle$$
+	$$
+	|\psi_\pm\rangle=\cos\frac{\psi}{2}|1\rangle\pm\sin\frac{\psi}{2}|0\rangle
+	$$
+	\includegraphics[scale=.7]{figs/lgapar.pdf}
+	
+	
+		
+	\end{frame}
+	\begin{frame}{Weak coupling implementation}
+		\vspace{-1cm}
+		\begin{itemize}
+		\item	two qubit gate $U\sim I$, basis $|00\rangle$, $|01\rangle$, $|10\rangle$, $|11\rangle$
+		
+		\item	IBM/IonQ -- native
+			
+			$$
+			RZZ(\theta)=\mathrm{diag}(1,e^{i\theta},e^{i\theta},1)
+			$$
+		\item IQM -- two CZ sandwiching $Y_\theta$
+		\bigskip
+		
+		\begin{tikzpicture}[scale=1]
+			\begin{yquant*}
+			qubit {} q[2];
+				init {} q[0];
+				init {} q[1];
+				box {$X_-$} q[1];
+				zz (q[0],q[1]);
+				box {$Y_\theta$} q[1];
+				zz (q[0],q[1]);
+				box {$X_+$} q[1];
+				\end{yquant*}
+			\end{tikzpicture}
+
+		\end{itemize}
+			Notation: $X=|0\rangle\langle 1|+|1\rangle\langle 0|$, $Y=i|1\rangle\langle 0-i|0\rangle\langle 1|$,
+			$V_\theta=\exp(-i\theta V)$, $V_\pm=V_{\pm\pi/2}$
+	\end{frame}
+	
+	\begin{frame}{Results on IBM/IonQ/IQM $\theta=0.1$}
+		\vspace{-1cm}
+	\begin{columns}
+			\begin{column}{0.5\textwidth}
+		IBM kingston ($C$ qubit specified) $2\cdot 10^7$ shots
+		\includegraphics[scale=.5]{figs/lgazzki.pdf}		
+		\end{column}
+		\begin{column}{0.5\textwidth}		
+		IQM Sirius ($CAB$ qubits specified) $10^6$ shots
+		\includegraphics[scale=.5]{figs/lgaiqm.pdf}
+		\end{column}
+		\end{columns}
+		\bigskip
+		
+				IonQ Forte 1: $1.272\pm 0.035$ ($A\to B$),
+	$1.289 \pm 0.035$ ($B\to A$)
+	
+	\end{frame}
+
+
+
+	\begin{frame}{Impact and roadmap}
+		
+		Challenges
+		\begin{itemize}
+		\item more access needed to lower error $\sigma\sim 1/\theta^2\sqrt{N}$,
+		\item pulse control $U\to U^\theta$, e.g. $CZ\to \mathrm{diag}(1,1,1,e^{\pm i\theta})$, 
+			continuous families of entangling gates
+		\item avoid postselection (full noninvasiveness)
+		\item Star topology $\to$ scale up the test, more detectors
+		\end{itemize}
+		
+Benefits		
+		\begin{itemize}
+		\item benchmarking partially entangling gates and pulse control
+		\item proposed benchmarking score/map (for the control range)
+		$$
+		Q-1,\: (Q-1)/\sigma
+		$$
+		\item  minimal disturbance: $\theta=1/10$ disturbance $1/400$.
+		\item robustness to noise -- no error correction needed
+		\end{itemize}
+		
+	\end{frame}
+
+	\begin{frame}{Thank you for your attention!}
+			\vspace{-1cm}
+	
+	https://github.com/Tomev/IQM\_Research\_Award\_2026
+	\bigskip
+
+		Last but not least!
+		\begin{itemize}
+		\item our long-standing collaborators/supporters: Wolfgang Belzig, Jakub Tworzyd{\l}o, and Josep Batle
+		\item to read more https://arxiv.org/abs/2603.22020
+		\item IBM Quantum, IonQ, IQM -- access provided
+		\item  Pozna{\'n} Supercomputing and Networking Center -- Polish access hub
+		\item funding "{}Excellence
+		initiative -- research university"{} for the AGH University in Krakow as well as the
+		ARTIQ project: UMO-2021/01/2/ST6/00004 and ARTIQ/0004/2021.
+		\end{itemize}
+	\end{frame}
+
+
+\end{document}
