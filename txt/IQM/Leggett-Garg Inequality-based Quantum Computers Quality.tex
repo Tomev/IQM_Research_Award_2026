@@ -253,29 +253,78 @@
 	
 	\begin{frame}{Motivation}
 		
-		\begin{itemize}
+		\begin{block}{European Quantum Strategy}
+
+			Our research are aligned with the European Quantum Strategy.			
+
+			\begin{itemize}
+
+				\item The need for independent benchmarking tools.
+				
+				\item Testing under-explored properties of quantum devices.
+				
+				\item Unexplained error sources found in previous research.
+
+			\end{itemize}
 			
-			\item Need for independent benchmarking tools
+		\end{block}
+	
+		\begin{block}{Constellation-topology devices}
 			
-			\item With accordance to European Quantum Strategy
+			With the advent of Constellation-topology devices, more attention
+			should be given to devices with central resonators.
 			
-			\item The use of Star-topology devices in the advent of  Constellation-type devices
+			\begin{itemize}
+
+				\item Software for devices with central resonator (e.g. Qubit Selector)
+				
+				\item Benchmarks that promote high inter-qubit connectivity.
+				
+				\item Dedicated implementation of weak measurements using
+				pulse-level access.
+				
+			\end{itemize}
 			
-			\item ...
-		\end{itemize}
+		\end{block}	
 	
 	\end{frame}
 
 
 	\begin{frame}{Executive summary}
 		
-		Executive summary ( judging panel made up of Department Heads, Management, and VPs of Technology)
+		\vspace{-0.3cm}
 		
-		
-		\begin{itemize}
-			\item What we did
-			\item Additional technical results (Star Device Qubit Selector, FakeSirius)
-		\end{itemize}
+		\begin{block}{Primary research}
+			We propose Leggett-Garg inequality-based benchmark that is:
+			\begin{itemize}
+
+				\item Highly scalable (different topologies, parallelization),
+				
+				\item Versatile: application to benchmarking partially entangling gates and pulse control,
+				
+				\item Extendable (pulse-controlled weak coupling, more qubits...),
+				
+				\item Robust to noise.
+				
+			\end{itemize}
+		\end{block} 
+	
+		\vspace{-0.2cm}
+	
+		\begin{block}{Technical results}
+			We present repository with the code we produced. Therein:
+			\begin{itemize}
+
+				\item Implementation of benchmark circuits, experimental
+				pipelines and analysis scripts.
+				
+				\item Qubit Selector for Star-shaped topology devices. Expandable to Constellation-topology devices.
+				
+				\item Simulators based on the historical calibration data.
+				
+			\end{itemize}
+		\end{block}
+	
 	
 	\end{frame}
 	
@@ -285,7 +334,6 @@
 		\vspace{-0.4cm}
 		
 		\begin{columns}
-			
 			
 			\begin{column}{0.5\textwidth}
 				\begin{block}{Projective (strong) measurement}
@@ -429,7 +477,7 @@
 
 
 	\begin{frame}{A test with strength dependence on $\lambda=\sin\theta$}
-		
+		\vspace{-1cm}
 		\begin{columns}
 			
 			\begin{column}{0.4\textwidth}
@@ -447,13 +495,18 @@
 			\begin{column}{0.6\textwidth}
 				\begin{figure} 
 					\includegraphics[scale=.7]{figs/lgapar.pdf}
-					\caption{Dependence of $Q$ on $\psi$.}
 				\end{figure} 
 			\end{column}
 		
 		
 		\end{columns}
 		
+		\begin{block}{Benchmark scores}
+			\begin{itemize}
+				\item Simple: $B_S = (Q-1)/\sigma = n_\sigma$
+				\item Normalized (one-tailed confidence): $B_N = \frac{1}{2} \mathrm{erf}\left( \frac{n_\sigma}{\sqrt{2}} \right)  $
+			\end{itemize}
+		\end{block}
 		
 	\end{frame}
 	
@@ -525,88 +578,314 @@
 
 
 
+	\begin{frame}{Experiments: Detectors independence ($\theta = 0.1$)}
 
-
-	\begin{frame}{e}
-		Detectors independence results
-	\end{frame}
-	
-	\begin{frame}{Results on IBM/IonQ/IQM $\theta=0.1$}
-		\vspace{-1cm}
-	\begin{columns}
+		\begin{columns}
+			
 			\begin{column}{0.5\textwidth}
-		IBM kingston ($C$ qubit specified) $2\cdot 10^7$ shots
-		\includegraphics[scale=.5]{figs/lgazzki.pdf}		
+				
+				\begin{block}{IQM Sirius}
+					\begin{figure}
+						
+						\includegraphics[width=\textwidth]{figs/detectors_iqm_sirius.pdf}
+						
+						\begin{itemize}
+							\item CAB qubits specified
+							\item $10^6$ shots per qubits set
+							\item $D$ within > 5 $\sigma$ from 0
+							\item Simulator close to real device
+						\end{itemize}
+						
+					\end{figure}
+				\end{block}
+				
+			\end{column}
+		
+			\begin{column}{0.5\textwidth}
+				
+				\begin{block}{IQM Emerald}
+					\begin{figure}
+						
+						\includegraphics[width=\textwidth]{figs/detectors_iqm_emerald.pdf}
+						
+						\begin{itemize}
+							\item CAB qubits specified
+							\item $10^6$ shots per qubits set
+							\item $D$ within < 1 $\sigma$ from 0
+							\item Simulation far from real device
+						\end{itemize}
+						
+					\end{figure}
+				\end{block}
+				
+			\end{column}
+			
+		\end{columns}
+
+	\end{frame}
+
+
+
+	\begin{frame}{Experiments: Benchmark score ($\theta = 0.1$)}
+		
+		\vspace{-0.25cm}
+		
+		\begin{columns}
+			
+			\begin{column}{0.48\textwidth}
+				
+				\begin{block}{IQM Sirius}
+					\begin{figure}
+						
+						\includegraphics[width=\textwidth]{figs/benchmark_iqm_sirius.pdf}
+												
+					\end{figure}
+				
+					Benchmark values (on device):
+					\begin{itemize}
+
+						\item $B_S^{AB} = 1.9954, \; B_S^{BA} = 3.7494$
+						
+						\item $B_N^{AB} = 0.9770, \; B_N^{BA} = 0.9999$
+						
+					\end{itemize}
+				
+				\end{block}
+				
+			\end{column}
+			
+			\begin{column}{0.48\textwidth}
+				
+				\begin{block}{IQM Emerald}
+					\begin{figure}
+						
+						\includegraphics[width=\textwidth]{figs/benchmark_iqm_emerald.pdf}
+											
+					\end{figure}
+				
+					Benchmark values (on device):
+					\begin{itemize}
+						
+						\item $B_S^{AB} = 2.5935, \; B_S^{BA} = 1.4625$
+						
+						\item $B_N^{AB} = 0.9253, \; B_N^{BA} = 0.9282$
+						
+					\end{itemize}
+				
+				\end{block}
+				
+			\end{column}
+			
+		\end{columns}
+	
+		\begin{alertblock}{Shots number}
+			The results could be improved with better statistics.
+		\end{alertblock}
+		
+	\end{frame}
+
+
+	
+	\begin{frame}{Experiments: Different providers ($\theta = 0.1$)}
+
+	\vspace{-0.4cm}
+	
+	\begin{columns}
+		\begin{column}{0.48\textwidth}
+			\begin{block}{IBM Kingston (RZZ, $2 \cdot 10^7$ shots)}
+				\begin{center}
+					\includegraphics[scale=.4]{figs/dzzki.pdf}
+					\includegraphics[scale=.4]{figs/lgazzki.pdf}		
+				\end{center}
+			\end{block}
 		\end{column}
-		\begin{column}{0.5\textwidth}		
-		IQM Sirius ($CAB$ qubits specified) $10^6$ shots
-		\includegraphics[scale=.5]{figs/lgaiqm.pdf}
+		\begin{column}{0.48\textwidth}		
+			\begin{block}{IBM Kingston (CZ, $2 \cdot 10^7$ shots)}
+				\begin{center}
+					\includegraphics[scale=.4]{figs/dczki.pdf}
+					\includegraphics[scale=.4]{figs/lgaczki.pdf}	
+				\end{center}
+			\end{block}
 		\end{column}
 		\end{columns}
-		\bigskip
-		
+		\begin{block}{IonQ Forte}
 				IonQ Forte 1: $1.272\pm 0.035$ ($A\to B$),
 	$1.289 \pm 0.035$ ($B\to A$)
+		\end{block}
+	\end{frame}
+
+
+
+
+	\begin{frame}{Failed Experiment: IQM Pulla}
+		
+		\begin{columns}
+			
+			\begin{column}{0.47\textwidth}
+				
+				\begin{itemize}
+
+					\item IQM Sirius
+					
+					\item \# shots = $10^6$
+					
+					\item qubits: [4, 5, 6] (best set)
+					
+					\item Measurement pulse amplitude halved for all qubits
+										
+				\end{itemize}
+		
+				\begin{alertblock}{Conclusions}
+					\begin{itemize}
+						
+						\item Naive pulse modification lead to poor results
+						
+						\item In some cases, benchmark inequality may still
+						be violated
+						
+					\end{itemize}
+				\end{alertblock}
+				
+			\end{column}
+		
+			\begin{column}{0.47\textwidth}
+				
+				\begin{block}{Detectors validation}
+					
+					\begin{itemize}
+
+						\item $D_{AB} = -0.000871 \pm 0.005872$
+						
+						\item $D_{BA} = -0.000068 \pm 0.005807$
+
+					\end{itemize}
+					
+				\end{block} 
+				
+				\begin{block}{Benchmark Scores}
+					
+					\begin{itemize}
+
+						\item $Q_{AB} = 0.8012 \pm 0.3660$
+												
+						\item $Q_{BA} = 1.8411 \pm 1.9617$
+						
+						\item $B_S^{AB} = -0.543063$
+					
+						\item $B_N^{AB} = 0.293543$
+					
+						\item $B_S^{BA} = 0.428756$
+					
+						\item $B_N^{BA} = 0.665950$
+						
+					\end{itemize}
+				\end{block}
+				
+			\end{column}
+			
+		\end{columns}
+
+	\end{frame}
+
+
+	\begin{frame}{Impact and directions}
+		
+		\vspace{-0.3cm}
+		
+		\begin{block}{Impact}
+			\begin{itemize}
+				
+				\item New benchmarking protocol for different properties of the device
+				
+				\item Benchmarking partially entangling gates and pulse control
+				
+				\item Robustness to noise -- no error correction needed
+				
+				\item Minimal disturbance: $\theta=0.1 \to $ disturbance $1/400$
+				
+				\item Device-agnostic (highly scalable)
+				
+			\end{itemize}
+		\end{block}
 	
-	\end{frame}
-
-	\begin{frame}{c}
-		Proposed benchmark results? 
-	\end{frame}
-
-	\begin{frame}{c}
-		IQM Pulla failed results
-	\end{frame}
-
-
-	\begin{frame}{Impact and roadmap}
+		\vspace{-0.2cm}
 		
-		Challenges
-		\begin{itemize}
-		\item more access needed to lower error $\sigma\sim 1/\theta^2\sqrt{N}$,
-		\item pulse control $U\to U^\theta$, e.g. $CZ\to \mathrm{diag}(1,1,1,e^{\pm i\theta})$, 
-			continuous families of entangling gates
-		\item avoid postselection (full noninvasiveness)
-		\item Star topology $\to$ scale up the test, more detectors
-		\item TODO(TR): CZ protocol works better!
-		\end{itemize}
-		
-		Benefits		
-		\begin{itemize}
-		\item benchmarking partially entangling gates and pulse control
-		\item proposed benchmarking score/map (for the control range)
-		$$
-		Q-1,\: (Q-1)/\sigma
-		$$
-		\item  minimal disturbance: $\theta=1/10$ disturbance $1/400$.
-		\item robustness to noise -- no error correction needed
-		\end{itemize}
+		\begin{block}{Research directions}
+
+			\begin{itemize}
+
+				\item Test benchmark limits with sufficient statistics ($\sigma\sim 1/\theta^2\sqrt{N}$)
+				
+				\item Weak coupling implementation using pulse-level control
+				e.g. creating continuous families of entangling gates ($CZ\to \mathrm{diag}(1,1,1,e^{\pm i\theta})$)
+				
+				\item Avoid postselection (full noninvasiveness)
+				
+				\item Scaling up the test. Extend qubits sets on star topology
+				devices. Benchmark score extension for whole device.
+				
+				\item Investigate the reason of $D$ increase in $RZZ$ protocol version.
+				
+			\end{itemize}
+		\end{block}
 		
 	\end{frame}
 
-	\begin{frame}{d}
-		Scalability 
-	\end{frame}
 
 	\begin{frame}{Thank you for your attention!}
-			\vspace{-1cm}
-	
-	https://github.com/Tomev/IQM\_Research\_Award\_2026
-	\bigskip
 
-		\textbf{Last but not least! Thanks to: }
-		\begin{itemize}
+		\vspace{-0.3cm}
+
+		\begin{block}{Special thanks to:}
+			\begin{itemize}
+				\item Our long-standing collaborators/supporters: 
+				\begin{itemize}
+					\item Wolfgang Belzig
+					\item Jakub Tworzyd{\l}o
+					\item Josep Batle
+				\end{itemize}
+							
+				\item Device providers: IQM, IBM, IonQ
+				
+				\item  Pozna{\'n} Supercomputing and Networking Center -- Polish access hub
+			\end{itemize}
+				
+		\end{block}
+	
+		\vspace{-0.3cm}
+	
+		\begin{columns}
 			
-			\item our long-standing collaborators/supporters: Wolfgang Belzig, Jakub Tworzyd{\l}o, and Josep Batle
-			\item IBM Quantum, IonQ, IQM -- access provided
-			\item  Pozna{\'n} Supercomputing and Networking Center -- Polish access hub
-			\item funding "{}Excellence
-			initiative -- research university"{} for the AGH University in Krakow as well as the
-			ARTIQ project: UMO-2021/01/2/ST6/00004 and ARTIQ/0004/2021.
+			\begin{column}{0.3\textwidth}
+				\begin{center} 
+					\begin{block}{Repository}
+						\begin{figure} 
+							\includegraphics{figs/IQM_repo_QR.png}
+						\end{figure}
+					\end{block}
+				\end{center}
+			\end{column}
+				
+			\vspace{-0.3cm}	
 			
-		\end{itemize}
+			\begin{column}{0.60\textwidth}
+				\begin{center}
+					
+					\begin{block}{Our LG manuscripts}
+						\begin{figure}
+							\includegraphics{figs/LG_QR.png}
+							\includegraphics{figs/LGA_QR.png}
+						\end{figure}
+					\end{block}
+				\end{center}
+			\end{column}
+	
+			
+		\end{columns}
 	
 	\end{frame}
+
+	
 
 
 \end{document}
