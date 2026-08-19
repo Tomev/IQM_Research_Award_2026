@@ -50,7 +50,7 @@ def star_device_transpile(circuit: QuantumCircuit, backend: IQMBackend, layout: 
     return compiled_qc
 
 
-def get_backend() -> IQMBackend:
+def get_backend(backend_name: str | None) -> IQMBackend:
     """
     Get the quantum backend from the IQM provider.
 
@@ -61,9 +61,12 @@ def get_backend() -> IQMBackend:
         EnvironmentError: If the required environment variables (`IQM_PROVIDER` or `IQM_COMPUTER`)
                           are not set.
     """
+    if not backend_name:
+        backend_name = os.environ["IQM_COMPUTER"]
+
     return IQMProvider(
         os.environ["IQM_PROVIDER"],
-        quantum_computer=os.environ["IQM_COMPUTER"],
+        quantum_computer=backend_name,
     ).get_backend()
 
 

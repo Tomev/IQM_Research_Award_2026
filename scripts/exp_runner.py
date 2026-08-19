@@ -21,15 +21,16 @@ def main():
     qubits_lists: list[list[int] | tuple[int, ...]] = get_layouts_from_layouts_info(
         "data/noisy_1e4_shots/2026-07-27_203226_layouts_info.json"
     )
-    qubits_lists = [(4, 5, 6)]
-    # noisy_pipeline(qubits_lists)
+    # qubits_lists = [(4, 5, 6)]
+    noisy_pipeline(qubits_lists)
     # device_pipeline(qubits_lists)
+    """
     settings: PullaSettings = PullaSettings(
         cz_amplitude_multiplier=None, measure_amplitude_multiplier=0.5, prx_amplitude_multiplier=None
     )
 
     pulla_pipeline(qubits_lists, settings)
-
+    """
     print(f"{datetime.now()}: Done")
 
 

@@ -14,13 +14,16 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 import pandas as pd
 from exa.common.data.setting_node import SettingNode
 from iqm.pulla.pulla import Pulla, PullaStash
 from iqm.pulla.utils_qiskit import qiskit_to_pulla, sweep_job_to_qiskit
+from iqm.qiskit_iqm import IQMProvider
 from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMBackendBase, IQMFakeBackend
 from iqm.qiskit_iqm.iqm_provider import IQMBackend
+from iqm.qubit_selector.qubit_selector import CostEvaluator
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit_aer import AerSimulator
 
@@ -37,7 +40,8 @@ from src.utils import get_backend, get_configuration_dicts, star_device_transpil
 # number of circuits per job is 100 (on IQM Sirius).
 #
 
-SYSTEM_NAME: str = "sirius"
+# SYSTEM_NAME: str = "sirius"
+SYSTEM_NAME: str = "emerald"
 N_JOBS_PER_LAYOUT: int = 3
 N_REPETITIONS: int = 10
 N_SHOTS: int = int(2e4)  # Max number of shots per circuit on IQM Sirius is 20000 (2e4).
@@ -87,10 +91,18 @@ def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> lis
     job.add_test_circuits([[0, 1, 2]], 0.1)
 
     circuit: QuantumCircuit = job.circuits[0]
+    best_layouts: list[tuple[tuple[int, ...], float]] = []
 
-    evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
-
-    best_layouts: list[tuple[tuple[int, ...], float]] = evaluator.get_top_layouts(n_layouts)
+    if backend.name == "sirius":
+        evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
+        best_layouts = evaluator.get_top_layouts(n_layouts)
+    else:
+        layouts, costs = CostEvaluator(backend=get_backend(backend.name), quantum_circuit=circuit).get_top_layouts(
+            num_layouts=n_layouts
+        )
+        for i in range(len(layouts)):
+            print(f"{layouts[i]}: {costs[i]}")
+            best_layouts.append((layouts[i], costs[i]))
 
     save_layouts_info(best_layouts)
 
