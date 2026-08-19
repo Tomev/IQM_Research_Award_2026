@@ -347,7 +347,7 @@ def device_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
     get_configuration_dicts(SYSTEM_NAME)  # Saves the system configuration during run.
 
     print(f"{datetime.now()}: Preparing backend...")
-    backend: IQMBackend = get_backend()
+    backend: IQMBackend = get_backend(SYSTEM_NAME)
 
     if len(qubits_lists) == 0:
         print(f"{datetime.now()}: Selecting best qubits list...")
