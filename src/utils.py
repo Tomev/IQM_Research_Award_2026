@@ -70,7 +70,7 @@ def get_backend(backend_name: str | None) -> IQMBackend:
     ).get_backend()
 
 
-def gather_jobs(jobs_summary_path: str) -> None:
+def gather_jobs(jobs_summary_path: str, backend_name: str) -> None:
     """Gathers jobs from the quantum device based on a summary file.
 
     Reads a summary file containing job information, retrieves the corresponding jobs
@@ -81,7 +81,7 @@ def gather_jobs(jobs_summary_path: str) -> None:
                            and other metadata.
     """
     print(f"{datetime.now()}: Getting backend...")
-    backend: IQMBackend = get_backend()
+    backend: IQMBackend = get_backend(backend_name)
     print(f"{datetime.now()}: Downloading jobs...")
     jobs: list[LGACZ2] = download_jobs(extract_job_summaries(jobs_summary_path), backend)
     zip_file_name: str = f"{NOW}_iqm_lg_real_{backend.name}_results"
