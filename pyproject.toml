@@ -9,6 +9,7 @@ dependencies = [
     "iqm-pulla[qiskit]>=14.0.0",
     "iqm-qubit-selector>=1.1.0",
     "matplotlib>=3.11.1",
+    "mthree>=3.0.0",
 ]
 
 [tool.pyrefly]
