@@ -1,18 +1,29 @@
+import json
 import math
 import os
+from collections import defaultdict
 from math import sin, sqrt
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
+from iqm.qiskit_iqm.iqm_provider import IQMBackend
+from mthree import M3Mitigation
 from numpy.typing import NDArray
 
 from src.pipelines import get_layouts_from_layouts_info
+from src.utils import get_backend
 
 # ---------------------------------------------------------------------------
 # settings
 # ---------------------------------------------------------------------------
 
 DATA_FOLDER: str = os.environ["EXP_DATA_PATH"]
+QUALITY_JSON_PATH: Path | None = Path("./data/gate_sirius/2026-07-27_213736_sirius_quality.json")
+BACKEND_NAME: str | None = "sirius"
+# RESULTS_FILE_PREFIX: str = ""
+RESULTS_FILE_PREFIX: str = "mitigated_"
 
 LAYOUTS: list[list[int]] = [[4, 5, 6]]  # Sirius
 # LAYOUTS: list[list[int]] = [[0, 1, 2]]  # Noiseless
@@ -20,13 +31,10 @@ LAYOUTS: list[list[int]] = [[4, 5, 6]]  # Sirius
 
 # LAYOUTS = get_layouts_from_layouts_info(f"{DATA_FOLDER}/2026-08-19_022221_layouts_info.json")
 
-
 N_LAYOUTS: int = len(LAYOUTS)
-# N_LAYOUTS = 1
 N_JOBS_PER_LAYOUT: int = 3
 N_STEERING_BITS: int = 8
 N_LAYOUTS_PER_JOB: int = 1
-
 
 WEAK_ANGLE: float = 0.1
 LAM: float = sin(WEAK_ANGLE)
@@ -35,6 +43,19 @@ STATES_ORDER: list[str] = ["000", "100", "010", "110", "001", "101", "011", "111
 
 # steering-bit groups.
 GROUPS: dict[str, tuple[int, ...]] = {"BA": (0, 3, 2, 1), "AB": (4, 7, 6, 5)}
+
+# contrast patterns, written on the ordered group (k0, k3, k2, k1)
+# Used during expectation values computation.
+_DOUBLE = np.array([+1.0, +1.0, -1.0, -1.0])  # ss, ab   -> lambda^2
+_FLAT = np.array([+1.0, +1.0, +1.0, +1.0])  # c        -> lambda^0
+_CONTR_A = np.array([-1.0, +1.0, -1.0, +1.0])  # ac, aa   -> lambda   (A sign)
+_CONTR_B = np.array([-1.0, +1.0, +1.0, -1.0])  # bc, bb   -> lambda   (B sign)
+
+# Columns order in the resultant analysis file.
+COLS: dict[str, dict[str, str]] = {
+    "AB": dict(a="Ab", b="aB", ac="AbC", bc="aBC", ab="AB", abc="ABC", c="abC"),
+    "BA": dict(a="bA", b="Ba", ac="bAC", bc="BaC", ab="BA", abc="BAC", c="baC"),
+}
 
 
 class LGResults:
@@ -86,13 +107,6 @@ def steering_sums(counts):
     )
 
 
-# contrast patterns, written on the ordered group (k0, k3, k2, k1)
-_DOUBLE = np.array([+1.0, +1.0, -1.0, -1.0])  # ss, ab   -> lambda^2
-_FLAT = np.array([+1.0, +1.0, +1.0, +1.0])  # c        -> lambda^0
-_CONTR_A = np.array([-1.0, +1.0, -1.0, +1.0])  # ac, aa   -> lambda   (A sign)
-_CONTR_B = np.array([-1.0, +1.0, +1.0, -1.0])  # bc, bb   -> lambda   (B sign)
-
-
 def observables(counts, lam=LAM):
     """
     All fourteen quantities and their errors, keyed by the column names of
@@ -130,11 +144,6 @@ def observables(counts, lam=LAM):
 # ---------------------------------------------------------------------------
 # Eq. (11), product form
 # ---------------------------------------------------------------------------
-
-COLS: dict[str, dict[str, str]] = {
-    "AB": dict(a="Ab", b="aB", ac="AbC", bc="aBC", ab="AB", abc="ABC", c="abC"),
-    "BA": dict(a="bA", b="Ba", ac="bAC", bc="BaC", ab="BA", abc="BAC", c="baC"),
-}
 
 
 def w11(obs, order: str):
@@ -238,6 +247,12 @@ def main(results_dir=DATA_FOLDER, lam=LAM):
             job_index += 1
         summed.sum_results()
 
+        # MITIGATION
+        if RESULTS_FILE_PREFIX != "":
+            # print(summed.raw_results)
+            apply_m3_correction(summed, LAYOUTS[q])
+            # print(summed.raw_results)
+
         rows = []
 
         # for q in range(len(LAYOUTS)):
@@ -278,11 +293,94 @@ def main(results_dir=DATA_FOLDER, lam=LAM):
         all_rows.extend(rows)
 
         df: pd.DataFrame = pd.DataFrame(rows)
-        df.to_csv(f"{results_dir}/lg_results_{LAYOUTS[q]}_summary.csv")
+
+        df.to_csv(f"{results_dir}/{RESULTS_FILE_PREFIX}lg_results_{LAYOUTS[q]}_summary.csv")
 
     df: pd.DataFrame = pd.DataFrame(all_rows)
-    df.to_csv(f"{results_dir}/lg_results_aggregated_summary.csv")
+    df.to_csv(f"{results_dir}/{RESULTS_FILE_PREFIX}lg_results_aggregated_summary.csv")
+
+
+def apply_m3_correction(summed_counts: LGResults, layout: list[int]):
+    """Applies `mthree` correction to the measurement results.
+
+    TODO(TR): Finish the docstring"""
+    error_matrices: dict[str, NDArray[np.floating]] = _get_qubit_measurement_error_matrices()
+
+    # for k, v in error_matrices.items():
+    #     print(f"\n\n{k}:\n\n{v}")
+    backend: IQMBackend = get_backend(BACKEND_NAME)
+    matrices_for_layout: list[NDArray[np.floating]] = []
+
+    for qubit_index in layout:
+        qubit_name: str = backend.index_to_qubit_name(qubit_index)
+        matrices_for_layout.append(error_matrices[qubit_name])
+
+    m3: M3Mitigation = M3Mitigation()
+    m3.cals_from_matrices(matrices_for_layout)
+
+    counts: list[dict[str, int]] = _to_qiskit_counts(summed_counts.raw_results)
+
+    quasi = m3.apply_correction(counts, range(len(layout)))
+    probs = quasi.nearest_probability_distribution()
+
+    mitigated_counts = []
+
+    for i in range(len(probs)):
+        n_shots: int = sum([v for v in counts[i].values()])
+        mitigated_counts.append({})
+
+        for k, v in probs[i].items():
+            mitigated_counts[-1][k] = int(v * n_shots)
+
+    # for i in range(len(counts)):
+    #    print(f"{i}:\n\t{counts[i]}\n\t{mitigated_counts[i]}")
+
+    # Apply mitigated counts
+    for i in range(len(summed_counts.raw_results)):
+        for state in STATES_ORDER:
+            summed_counts.raw_results.loc[i, state] = mitigated_counts[i][str(state)]
+
+
+def _get_qubit_measurement_error_matrices() -> dict[str, NDArray[np.floating]]:
+    """TODO(TR): Docstring"""
+
+    quality_dict: dict[str, Any]
+    readout_errors: dict[str, dict[str, float]] = defaultdict(lambda: {})
+
+    with QUALITY_JSON_PATH.open() as f:
+        quality_dict = json.load(f)
+
+    for observation in quality_dict["observations"]:
+        if "error_0_to_1" in observation["dut_field"]:
+            component_name = observation["dut_field"].split(".")[-2]
+            readout_errors[component_name]["0"] = observation["value"]
+
+        if "error_1_to_0" in observation["dut_field"]:
+            component_name = observation["dut_field"].split(".")[-2]
+            readout_errors[component_name]["1"] = observation["value"]
+
+    error_matrices: dict[str, NDArray[np.floating]] = {}
+
+    for k, v in readout_errors.items():
+        error_matrices[k] = np.array([[1 - v["0"], v["1"]], [v["0"], 1 - v["1"]]])
+
+    return error_matrices
+
+
+def _to_qiskit_counts(summed_counts: pd.DataFrame) -> list[dict[str, int]]:
+    """TODO(TR): Docstring"""
+    counts: list[dict[str, int]] = []
+
+    for _, row in summed_counts.iterrows():
+        row_counts: dict[str, int] = {}
+        for state in STATES_ORDER:
+            row_counts[str(state)] = int(row[state])
+        counts.append(row_counts)
+
+    return counts
 
 
 if __name__ == "__main__":
+    print("\n\nAnalysis start.")
     main()
+    print("\n\nAnalysis done.")
