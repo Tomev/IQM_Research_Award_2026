@@ -1,3 +1,4 @@
+import math
 import os
 from math import sin, sqrt
 
@@ -13,13 +14,16 @@ from src.pipelines import get_layouts_from_layouts_info
 
 DATA_FOLDER: str = os.environ["EXP_DATA_PATH"]
 
-# LAYOUTS: list[list[int]] = [[4, 5, 6]]
-LAYOUTS: list[list[int]] = [[0, 1, 2]]
-# LAYOUTS = get_layouts_from_layouts_info(f"{DATA_FOLDER}/2026-07-27_203226_layouts_info.json")
+LAYOUTS: list[list[int]] = [[4, 5, 6]]  # Sirius
+# LAYOUTS: list[list[int]] = [[0, 1, 2]]  # Noiseless
+# LAYOUTS: list[list[int]] = [[50, 43, 44]]  # Emerald
+
+# LAYOUTS = get_layouts_from_layouts_info(f"{DATA_FOLDER}/2026-08-19_022221_layouts_info.json")
+
 
 N_LAYOUTS: int = len(LAYOUTS)
 # N_LAYOUTS = 1
-N_JOBS_PER_LAYOUT: int = 10
+N_JOBS_PER_LAYOUT: int = 3
 N_STEERING_BITS: int = 8
 N_LAYOUTS_PER_JOB: int = 1
 
@@ -263,6 +267,10 @@ def main(results_dir=DATA_FOLDER, lam=LAM):
                 f"Set {q} order {order}:   Eq.(12) pooled  {pooled['D']:+.3e} +- {pooled['err']:.1e}"
                 f"  ({pooled['D'] / pooled['err']:+.2f} sigma, {pooled['method']})"
             )
+            print(f"=== Benchmark ({order}) ===")
+            n_sigma: float = (w - 1) / ew
+            print(f"Simple: {n_sigma}, Normalized: {0.5 * (1 + math.erf(n_sigma / math.sqrt(2)))}")
+
             # print(f"      Eq.(12) per-job {perjob['D']:+.3e} +- {perjob['err']:.1e}"
             #      f"  ({perjob['D']/perjob['err']:+.2f} sigma)")
         row.update({k: v for k, v in obs.items() if k != "n_shots"})
