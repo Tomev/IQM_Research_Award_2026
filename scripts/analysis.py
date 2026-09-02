@@ -1,401 +1,287 @@
+import math
 import os
 from math import sin, sqrt
 
+import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from src.pipelines import get_layouts_from_layouts_info
 
-# Settings
-N_JOBS_PER_LAYOUT: int = 5
-N_STEERIING_BITS: int = 8
+# ---------------------------------------------------------------------------
+# settings
+# ---------------------------------------------------------------------------
 
-STATES_ORDER = ["000", "100", "010", "110", "001", "101", "011", "111"]
-COLUMNS: list[str] = [
-    "qubits",
-    "LGBA",
-    "LGeBA",
-    "LGAB",
-    "LGeAB",
-    "ABC",
-    "eABC",
-    "BAC",
-    "eBAC",
-    "AbC",
-    "eAbC",
-    "bAC",
-    "ebAC",
-    "BaC",
-    "eBaC",
-    "aBC",
-    "eaBC",
-    "abC",
-    "eabC",
-    "baC",
-    "ebaC",
-    "AB",
-    "eAB",
-    "BA",
-    "eBA",
-    "Ab",
-    "eAb",
-    "bA",
-    "ebA",
-    "Ba",
-    "eBa",
-    "aB",
-    "eaB",
-]
-
-
-LAYOUTS = get_layouts_from_layouts_info("./data/noisy_1e4_shots/2026-07-27_203226_layouts_info.json")
-LAYOUTS = [(4, 5, 6)]  # For gate sirius experiment
 DATA_FOLDER: str = os.environ["EXP_DATA_PATH"]
 
+LAYOUTS: list[list[int]] = [[4, 5, 6]]  # Sirius
+# LAYOUTS: list[list[int]] = [[0, 1, 2]]  # Noiseless
+# LAYOUTS: list[list[int]] = [[50, 43, 44]]  # Emerald
 
-class LGResult:
+# LAYOUTS = get_layouts_from_layouts_info(f"{DATA_FOLDER}/2026-08-19_022221_layouts_info.json")
+
+
+N_LAYOUTS: int = len(LAYOUTS)
+# N_LAYOUTS = 1
+N_JOBS_PER_LAYOUT: int = 3
+N_STEERING_BITS: int = 8
+N_LAYOUTS_PER_JOB: int = 1
+
+
+WEAK_ANGLE: float = 0.1
+LAM: float = sin(WEAK_ANGLE)
+
+STATES_ORDER: list[str] = ["000", "100", "010", "110", "001", "101", "011", "111"]
+
+# steering-bit groups.
+GROUPS: dict[str, tuple[int, ...]] = {"BA": (0, 3, 2, 1), "AB": (4, 7, 6, 5)}
+
+
+class LGResults:
     def __init__(self, results_table: pd.DataFrame) -> None:
-        self.raw_results = results_table
+        self.raw_results: pd.DataFrame = results_table
 
-    def AppendResults(self, result: pd.DataFrame) -> None:
+    def append_results(self, result: pd.DataFrame) -> None:
         self.raw_results = pd.concat([self.raw_results, pd.DataFrame(result)], ignore_index=True)
 
-    def Calculate(self, qubit_set_idx):
-        b = []
-        for steering_bit in range(N_STEERIING_BITS):
-            a = []
-            selected_row = self.raw_results.loc[
+    def calculate(self, qubit_set_idx) -> NDArray[np.floating]:
+        b: list[list[NDArray]] = []
+        for steering_bit in range(N_STEERING_BITS):
+            a: list[NDArray] = []
+            selected_row: pd.DataFrame = self.raw_results.loc[
                 (self.raw_results["qubits_set_index"] == qubit_set_idx) & (self.raw_results["i"] == steering_bit)
             ]
             for state in STATES_ORDER:
+                # print(selected_row)
+                # print(qubit_set_idx)
+                # print(steering_bit)
                 a.append(selected_row[state].to_numpy()[0])
-
             b.append(a)
+        return np.asarray(b, dtype=float)
 
-        return b
-
-    def SumResults(self) -> None:
-        # i denotes steering_bit "value"
+    def sum_results(self) -> None:
         self.raw_results = self.raw_results.groupby(["i", "qubits_set_index"], as_index=False).sum()
 
 
-def main():
-    aggregated_df: pd.DataFrame = pd.DataFrame(columns=COLUMNS)
+# ---------------------------------------------------------------------------
+# per-steering-bit sums
+# ---------------------------------------------------------------------------
 
-    for layout_index in range(len(LAYOUTS)):
-        print(layout_index)
 
-        summed_result = LGResult(pd.DataFrame())
+def steering_sums(counts):
+    """counts: (8 steering bits) x (8 states).  Returns the seven sums."""
+    i: dict[str, int] = {s: STATES_ORDER.index(s) for s in STATES_ORDER}
+    k000, k100, k010, k110 = i["000"], i["100"], i["010"], i["110"]
+    k001, k101, k011, k111 = i["001"], i["101"], i["011"], i["111"]
+    n = counts
 
-        for i in range(N_JOBS_PER_LAYOUT):
-            pd_result = pd.read_csv(f"{DATA_FOLDER}/results_tests_{i + N_JOBS_PER_LAYOUT * layout_index}.csv")
+    return dict(
+        c=n[:, k000] + n[:, k100] + n[:, k010] + n[:, k110],
+        ss=n[:, k000] - n[:, k100] - n[:, k010] + n[:, k110],
+        ac=n[:, k000] + n[:, k100] - n[:, k010] - n[:, k110],
+        bc=n[:, k000] - n[:, k100] + n[:, k010] - n[:, k110],
+        ab=(n[:, k000] - n[:, k100] - n[:, k010] + n[:, k110] + n[:, k001] - n[:, k101] - n[:, k011] + n[:, k111]),
+        aa=(n[:, k000] + n[:, k100] - n[:, k010] - n[:, k110] + n[:, k001] + n[:, k101] - n[:, k011] - n[:, k111]),
+        bb=(n[:, k000] - n[:, k100] + n[:, k010] - n[:, k110] + n[:, k001] - n[:, k101] + n[:, k011] - n[:, k111]),
+    )
 
-            summed_result.AppendResults(pd_result)
 
-            raw_results = LGResult(pd.DataFrame())
-            raw_results.AppendResults(pd_result)
+# contrast patterns, written on the ordered group (k0, k3, k2, k1)
+_DOUBLE = np.array([+1.0, +1.0, -1.0, -1.0])  # ss, ab   -> lambda^2
+_FLAT = np.array([+1.0, +1.0, +1.0, +1.0])  # c        -> lambda^0
+_CONTR_A = np.array([-1.0, +1.0, -1.0, +1.0])  # ac, aa   -> lambda   (A sign)
+_CONTR_B = np.array([-1.0, +1.0, +1.0, -1.0])  # bc, bb   -> lambda   (B sign)
 
-            raw_results.SumResults()
 
-        summed_result.SumResults()
+def observables(counts, lam=LAM):
+    """
+    All fourteen quantities and their errors, keyed by the column names of
+    results-*.csv.  Errors are the same Bernoulli expressions as before:
+    for a variable X with X**2 = 1_c the per-setting variance is p_k - m_k**2,
+    for X**2 = 1 it is 1 - m_k**2.
+    """
+    s = steering_sums(counts)
+    n_shots: int = counts[0].sum()
+    out = {}
 
-        weak_meas_rotation_angle_v = 0.1  # That's our weak measurement rotation angle.
-        weak_meas_rotation_angle = sin(weak_meas_rotation_angle_v)
+    for order, g in GROUPS.items():
+        g = list(g)
+        p = s["c"][g] / n_shots  # P(c=1) per setting
+        # names: (column, source array, contrast, power of lambda, X**2 is 1_c?)
+        spec = [
+            ("abC" if order == "AB" else "baC", "c", _FLAT, 0, True),
+            ("ABC" if order == "AB" else "BAC", "ss", _DOUBLE, 2, True),
+            ("AB" if order == "AB" else "BA", "ab", _DOUBLE, 2, False),
+            ("AbC" if order == "AB" else "bAC", "ac", _CONTR_A, 1, True),
+            ("aBC" if order == "AB" else "BaC", "bc", _CONTR_B, 1, True),
+            ("Ab" if order == "AB" else "bA", "aa", _CONTR_A, 1, False),
+            ("aB" if order == "AB" else "Ba", "bb", _CONTR_B, 1, False),
+        ]
+        for col, arr, sign, power, conditional in spec:
+            m = s[arr][g] / n_shots
+            out[col] = float((sign * m).sum() / (4 * lam**power))
+            var = (p - m**2).sum() if conditional else (4.0 - (m**2).sum())
+            out["e" + col] = float(sqrt(var / n_shots) / (4 * lam**power))
 
-        inequality_values_AB = []
-        inequality_values_BA = []
-        inequality_values_AbC = []
-        inequality_values_bAC = []
-        inequality_values_BaC = []
-        inequality_values_aBC = []
-        inequality_errors_AB = []
-        inequality_errors_BA = []
-        inequality_errors_AbC = []
-        inequality_errors_bAC = []
-        inequality_errors_BaC = []
-        inequality_errors_aBC = []
-        order = []
-        eorder = []
-        val_abC = []
-        val_baC = []
-        er_abC = []
-        er_baC = []
-        val_AB = []
-        val_BA = []
-        er_AB = []
-        er_BA = []
-        val_ABC = []
-        val_BAC = []
-        er_ABC = []
-        er_BAC = []
-        val_BaC = []
-        val_aBC = []
-        er_BaC = []
-        er_aBC = []
-        val_AbC = []
-        val_bAC = []
-        er_AbC = []
-        er_bAC = []
-        val_Ab = []
-        val_bA = []
-        er_Ab = []
-        er_bA = []
-        val_aB = []
-        val_Ba = []
-        er_aB = []
-        er_Ba = []
+    out["n_shots"] = n_shots
+    return out
 
-        qubs = []
-        # inequality_values_mean = []
-        counts_per_steering_bit = summed_result.Calculate(0)
 
-        n_shots = 0
+# ---------------------------------------------------------------------------
+# Eq. (11), product form
+# ---------------------------------------------------------------------------
 
-        for measured_state_idx in range(N_STEERIING_BITS):
-            n_shots += counts_per_steering_bit[0][measured_state_idx]
+COLS: dict[str, dict[str, str]] = {
+    "AB": dict(a="Ab", b="aB", ac="AbC", bc="aBC", ab="AB", abc="ABC", c="abC"),
+    "BA": dict(a="bA", b="Ba", ac="bAC", bc="BaC", ab="BA", abc="BAC", c="baC"),
+}
 
-        print("Qubit_set_index:", layout_index)
-        print("Trials: ", n_shots)
 
-        # print(counts_per_steering_bit)
+def w11(obs, order: str):
+    """<ac><bc>/(<c><abc>); error from the <abc> term only, as before."""
+    k: dict[str, str] = COLS[order]
+    w = obs[k["ac"]] * obs[k["bc"]] / (obs[k["c"]] * obs[k["abc"]])
+    return w, abs(w) * obs["e" + k["abc"]] / abs(obs[k["abc"]])
 
-        ss = []
-        ac = []
-        ab = []
-        bc = []
-        aa = []
-        bb = []
-        c = []
-        print("xxC")
 
-        for steering_bit in range(N_STEERIING_BITS):
-            sc = (
-                +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("010")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("110")]
+# ---------------------------------------------------------------------------
+# Eq. (12)
+# ---------------------------------------------------------------------------
+
+
+def d12(obs, order: str):
+    """the bare statistic  <a><bc> - <b><ac>  (units lambda^-2)"""
+    k: dict[str, str] = COLS[order]
+    return obs[k["a"]] * obs[k["bc"]] - obs[k["b"]] * obs[k["ac"]]
+
+
+def eq12_propagated(obs, order):
+    """D, its independent-error propagation, and the two gain ratios."""
+    k = COLS[order]
+    a, b = obs[k["a"]], obs[k["b"]]
+    ac, bc = obs[k["ac"]], obs[k["bc"]]
+    r_A = a - ac
+    r_B = b - bc
+    ea, eb = obs["e" + k["a"]], obs["e" + k["b"]]
+    eac, ebc = obs["e" + k["ac"]], obs["e" + k["bc"]]
+
+    D = a * bc - b * ac
+    S = a * bc + b * ac
+    eD = sqrt((bc * ea) ** 2 + (a * ebc) ** 2 + (ac * eb) ** 2 + (b * eac) ** 2)
+    r_dir, r_cond = a / b, ac / bc
+    return dict(
+        D=D,
+        eD=eD,
+        nsig=D / eD if eD else np.nan,
+        rel=2 * D / (a * bc + b * ac),
+        r_dir=r_dir,
+        er_dir=abs(r_dir) * sqrt((ea / a) ** 2 + (eb / b) ** 2),
+        r_cond=r_cond,
+        er_cond=abs(r_cond) * sqrt((eac / ac) ** 2 + (ebc / bc) ** 2),
+        nsig_a_eq_b=(a - b) / np.hypot(ea, eb),
+        nsig_ac_eq_bc=(ac - bc) / np.hypot(eac, ebc),
+        S=S,
+    )
+
+
+def eq12_pooled(job_counts, order, lam=LAM):
+    """
+    Version A.  Sum the jobs, form the averages, then D.
+    """
+    job_counts = [np.asarray(c, dtype=float) for c in job_counts]
+    J = len(job_counts)
+    total = sum(job_counts)
+    D_full = d12(observables(total, lam), order)
+
+    obs = observables(total, lam)
+    p = eq12_propagated(obs, order)
+    return dict(D=D_full, err=p["eD"], method="pooled", n_jobs=J, S=p["S"])
+
+
+def eq12_perjob(job_counts, order, lam=LAM):
+    """
+    Version B.  D_j in each job, then the plain mean.
+    """
+    job_counts = [np.asarray(c, dtype=float) for c in job_counts]
+    J = len(job_counts)
+    per = [eq12_propagated(observables(c, lam), order) for c in job_counts]
+    D_j = np.array([p["D"] for p in per])
+    e_j = np.array([p["eD"] for p in per])
+
+    Dbar = D_j.mean()
+    err = np.sqrt(sum(e_j[i] ** 2 for i in range(J))) / J
+    return dict(D=Dbar, err=err, method="mean over jobs", n_jobs=J)
+
+
+# ---------------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------------
+
+
+def main(results_dir=DATA_FOLDER, lam=LAM):
+    # n_jobs: int = len(LAYOUTS) * N_JOBS_PER_LAYOUT
+
+    job_index: int = 0
+    all_rows: list = []
+
+    for q in range(len(LAYOUTS)):
+        per_job = []
+        summed = LGResults(pd.DataFrame())
+
+        for _ in range(N_JOBS_PER_LAYOUT):
+            pd_result = pd.read_csv(f"{results_dir}/results_tests_{job_index}.csv", index_col=0)
+            summed.append_results(pd_result)
+            one = LGResults(pd.DataFrame())
+            one.append_results(pd_result)
+            one.sum_results()
+            per_job.append(one)
+            job_index += 1
+        summed.sum_results()
+
+        rows = []
+
+        # for q in range(len(LAYOUTS)):
+        pooled_counts = summed.calculate(0)
+        job_counts = [pj.calculate(0) for pj in per_job]
+
+        obs = observables(pooled_counts, lam)
+        row = {"qubits": LAYOUTS[q]}
+
+        for order in ("AB", "BA"):
+            w, ew = w11(obs, order)
+            prop = eq12_propagated(obs, order)
+            pooled = eq12_pooled(job_counts, order, lam)
+            perjob = eq12_perjob(job_counts, order, lam)
+
+            tag: str = "LG" + order
+            row[tag] = w
+            row["LGe" + order] = ew
+            row["D" + order] = pooled["D"]
+            row["S" + order] = pooled["S"]
+            row["eD" + order] = pooled["err"]
+            # print(f"Set {q} order {order}:   Eq.(11)   {w:+.3e} +- {ew:.1e}"
+            #      f"  ({(w-1)/ew:+.2f} sigma, )")
+            # row["D12job" + order] = perjob["D"]
+            # row["eD12job" + order] = perjob["err"]
+            print(
+                f"Set {q} order {order}:   Eq.(12) pooled  {pooled['D']:+.3e} +- {pooled['err']:.1e}"
+                f"  ({pooled['D'] / pooled['err']:+.2f} sigma, {pooled['method']})"
             )
-            s = (
-                +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("010")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("110")]
-            )
-            sac = (
-                +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("010")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("110")]
-            )
+            print(f"=== Benchmark ({order}) ===")
+            n_sigma: float = (w - 1) / ew
+            print(f"Simple: {n_sigma}, Normalized: {0.5 * (1 + math.erf(n_sigma / math.sqrt(2)))}")
 
-            sbc = (
-                +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("010")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("110")]
-            )
-            sab = (
-                +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("010")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("110")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("001")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("101")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("011")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("111")]
-            )
-            sa = (
-                +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("010")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("110")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("001")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("101")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("011")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("111")]
-            )
-            sb = (
-                +counts_per_steering_bit[steering_bit][STATES_ORDER.index("000")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("100")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("010")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("110")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("001")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("101")]
-                + counts_per_steering_bit[steering_bit][STATES_ORDER.index("011")]
-                - counts_per_steering_bit[steering_bit][STATES_ORDER.index("111")]
-            )
-            c.append(sc)
-            ss.append(s)
-            ac.append(sac)
-            ab.append(sab)
-            bc.append(sbc)
-            aa.append(sa)
-            bb.append(sb)
+            # print(f"      Eq.(12) per-job {perjob['D']:+.3e} +- {perjob['err']:.1e}"
+            #      f"  ({perjob['D']/perjob['err']:+.2f} sigma)")
+        row.update({k: v for k, v in obs.items() if k != "n_shots"})
+        rows.append(row)
+        all_rows.extend(rows)
 
-        # Indices in the equations below denote the value of steering_bits of the run.
-        # All the ss, ac, ab, bc, aa, bb have 8 elements.
+        df: pd.DataFrame = pd.DataFrame(rows)
+        df.to_csv(f"{results_dir}/lg_results_{LAYOUTS[q]}_summary.csv")
 
-        # For steering_qubit in [0, 3], the weak measurements order is A B, hence
-        # we only use 0-3 indices in the equations below.
-        print("baC")
-        baC = (c[0] + c[3] + c[2] + c[1]) / (n_shots * 4)
-        ebaC = (c[0] + c[3] + c[2] + c[1]) / (n_shots) - (c[0] ** 2 + c[3] ** 2 + c[2] ** 2 + c[1] ** 2) / (
-            n_shots
-        ) ** 2
-        print(baC, sqrt(ebaC / n_shots) / 4)
-        print("abC")
-        abC = (c[4] + c[7] + c[6] + c[5]) / (n_shots * 4)
-        eabC = (c[4] + c[7] + c[6] + c[5]) / n_shots - (c[4] ** 2 + c[7] ** 2 + c[6] ** 2 + c[5] ** 2) / (n_shots) ** 2
-        print(abC, sqrt(eabC / n_shots) / 4)
-        print("BAC")
-        BAC = (ss[0] + ss[3] - ss[2] - ss[1]) / (n_shots * weak_meas_rotation_angle * weak_meas_rotation_angle * 4)
-        eBAC = (c[0] + c[3] + c[2] + c[1]) / (n_shots) - (ss[0] ** 2 + ss[3] ** 2 + ss[2] ** 2 + ss[1] ** 2) / (
-            n_shots
-        ) ** 2
-        print(BAC, sqrt(eBAC / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        print("ABC")
-        ABC = (ss[4] + ss[7] - ss[6] - ss[5]) / (n_shots * weak_meas_rotation_angle * weak_meas_rotation_angle * 4)
-        eABC = (c[4] + c[7] + c[6] + c[5]) / n_shots - (ss[4] ** 2 + ss[7] ** 2 + ss[6] ** 2 + ss[5] ** 2) / (
-            n_shots
-        ) ** 2
-        print(ABC, sqrt(eABC / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        print("BA")
-        BA = (ab[0] + ab[3] - ab[2] - ab[1]) / (n_shots * weak_meas_rotation_angle * weak_meas_rotation_angle * 4)
-        eBA = 4 - (ab[0] ** 2 + ab[3] ** 2 + ab[2] ** 2 + ab[1] ** 2) / (n_shots) ** 2
-        print(BA, sqrt(eBA / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        print("AB")
-        AB = (ab[4] + ab[7] - ab[6] - ab[5]) / (n_shots * weak_meas_rotation_angle * weak_meas_rotation_angle * 4)
-        eAB = 4 - (ab[4] ** 2 + ab[7] ** 2 + ab[6] ** 2 + ab[5] ** 2) / (n_shots) ** 2
-        print(AB, sqrt(eAB / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        print("bAC")
-        bAC = -(ac[0] - ac[3] + ac[2] - ac[1]) / (n_shots * weak_meas_rotation_angle * 4)
-        ebAC = (c[0] + c[3] + c[2] + c[1]) / (n_shots) - (ac[0] ** 2 + ac[3] ** 2 + ac[2] ** 2 + ac[1] ** 2) / (
-            n_shots
-        ) ** 2
-        print(bAC, sqrt(ebAC / n_shots) / (4 * weak_meas_rotation_angle))
-        print("AbC")
-        AbC = -(ac[4] - ac[7] + ac[6] - ac[5]) / (n_shots * weak_meas_rotation_angle * 4)
-        eAbC = (c[4] + c[7] + c[6] + c[5]) / n_shots - (ac[4] ** 2 + ac[7] ** 2 + ac[6] ** 2 + ac[5] ** 2) / (
-            n_shots
-        ) ** 2
-        print(AbC, sqrt(eAbC / n_shots) / (4 * weak_meas_rotation_angle))
-        print("BaC")
-        BaC = -(bc[0] - bc[3] - bc[2] + bc[1]) / (n_shots * weak_meas_rotation_angle * 4)
-        eBaC = (c[0] + c[3] + c[2] + c[1]) / (n_shots) - (bc[0] ** 2 + bc[3] ** 2 + bc[2] ** 2 + bc[1] ** 2) / (
-            n_shots
-        ) ** 2
-        print(BaC, sqrt(eBaC / n_shots) / (4 * weak_meas_rotation_angle))
-        print("aBC")
-        aBC = -(bc[4] - bc[7] - bc[6] + bc[5]) / (n_shots * weak_meas_rotation_angle * 4)
-        eaBC = (c[4] + c[7] + c[6] + c[5]) / n_shots - (bc[4] ** 2 + bc[7] ** 2 + bc[6] ** 2 + bc[5] ** 2) / (
-            n_shots
-        ) ** 2
-        print(aBC, sqrt(eaBC / n_shots) / (4 * weak_meas_rotation_angle))
-        print("bA")
-        bA = -(aa[0] - aa[3] + aa[2] - aa[1]) / (n_shots * weak_meas_rotation_angle * 4)
-        ebA = 4 - (aa[0] ** 2 + aa[3] ** 2 + aa[2] ** 2 + aa[1] ** 2) / (n_shots) ** 2
-        print(bA, sqrt(ebA / n_shots) / (4 * weak_meas_rotation_angle))
-        print("Ab")
-        Ab = -(aa[4] - aa[7] + aa[6] - aa[5]) / (n_shots * weak_meas_rotation_angle * 4)
-        eAb = 4 - (aa[4] ** 2 + aa[7] ** 2 + aa[6] ** 2 + aa[5] ** 2) / (n_shots) ** 2
-        print(Ab, sqrt(eAb / n_shots) / (4 * weak_meas_rotation_angle))
-        print("Ba")
-        Ba = -(bb[0] - bb[3] - bb[2] + bb[1]) / (n_shots * weak_meas_rotation_angle * 4)
-        eBa = 4 - (bb[0] ** 2 + bb[3] ** 2 + bb[2] ** 2 + bb[1] ** 2) / (n_shots) ** 2
-        print(Ba, sqrt(eBa / n_shots) / (4 * weak_meas_rotation_angle))
-        print("aB")
-        aB = -(bb[4] - bb[7] - bb[6] + bb[5]) / (n_shots * weak_meas_rotation_angle * 4)
-        eaB = 4 - (bb[4] ** 2 + bb[7] ** 2 + bb[6] ** 2 + bb[5] ** 2) / (n_shots) ** 2
-        print(aB, sqrt(eaB / n_shots) / (4 * weak_meas_rotation_angle))
-        qubs.append(LAYOUTS[layout_index])
-        wBA = (bAC + BaC) ** 2 / (4 * baC * BAC)
-        wAB = (AbC + aBC) ** 2 / (4 * abC * ABC)
-        inequality_values_BA.append(wBA)
-        inequality_values_AB.append(wAB)
-        inequality_errors_BA.append(
-            (bAC + BaC) ** 2
-            * sqrt(eBAC / n_shots)
-            / (baC * 16 * weak_meas_rotation_angle * weak_meas_rotation_angle * BAC**2)
-        )
-        inequality_errors_AB.append(
-            (AbC + aBC) ** 2
-            * sqrt(eABC / n_shots)
-            / (abC * 16 * weak_meas_rotation_angle * weak_meas_rotation_angle * ABC**2)
-        )
-        val_abC.append(abC)
-        val_baC.append(baC)
-        er_abC.append(sqrt(eabC / n_shots) / (4))
-        er_baC.append(sqrt(ebaC / n_shots) / (4))
-        val_AB.append(AB)
-        val_BA.append(BA)
-        er_AB.append(sqrt(eAB / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        er_BA.append(sqrt(eBA / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        val_ABC.append(ABC)
-        val_BAC.append(BAC)
-        er_ABC.append(sqrt(eABC / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        er_BAC.append(sqrt(eBAC / n_shots) / (4 * weak_meas_rotation_angle * weak_meas_rotation_angle))
-        val_BaC.append(BaC)
-        val_aBC.append(aBC)
-        er_BaC.append(sqrt(eBaC / n_shots) / (4 * weak_meas_rotation_angle))
-        er_aBC.append(sqrt(eaBC / n_shots) / (4 * weak_meas_rotation_angle))
-        val_AbC.append(AbC)
-        val_bAC.append(bAC)
-        er_AbC.append(sqrt(eAbC / n_shots) / (4 * weak_meas_rotation_angle))
-        er_bAC.append(sqrt(ebAC / n_shots) / (4 * weak_meas_rotation_angle))
-        val_Ab.append(Ab)
-        val_bA.append(bA)
-        er_Ab.append(sqrt(eAb / n_shots) / (4 * weak_meas_rotation_angle))
-        er_bA.append(sqrt(ebA / n_shots) / (4 * weak_meas_rotation_angle))
-        val_aB.append(aB)
-        val_Ba.append(Ba)
-        er_aB.append(sqrt(eaB / n_shots) / (4 * weak_meas_rotation_angle))
-        er_Ba.append(sqrt(eBa / n_shots) / (4 * weak_meas_rotation_angle))
-
-        indices = range(len(inequality_values_AB))
-
-        df = pd.DataFrame(
-            columns=COLUMNS,
-            index=indices,
-        )
-
-        for i in indices:
-            df.loc[i, "qubits"] = qubs[i]
-            df.loc[i, "LGBA"] = inequality_values_BA[i]
-            df.loc[i, "LGeBA"] = inequality_errors_BA[i]
-            df.loc[i, "LGAB"] = inequality_values_AB[i]
-            df.loc[i, "LGeAB"] = inequality_errors_AB[i]
-            df.loc[i, "BA"] = val_BA[i]
-            df.loc[i, "eBA"] = er_BA[i]
-            df.loc[i, "AB"] = val_AB[i]
-            df.loc[i, "eAB"] = er_AB[i]
-            df.loc[i, "BaC"] = val_BaC[i]
-            df.loc[i, "eBaC"] = er_BaC[i]
-            df.loc[i, "aBC"] = val_aBC[i]
-            df.loc[i, "eaBC"] = er_aBC[i]
-            df.loc[i, "bAC"] = val_bAC[i]
-            df.loc[i, "ebAC"] = er_bAC[i]
-            df.loc[i, "AbC"] = val_AbC[i]
-            df.loc[i, "eAbC"] = er_AbC[i]
-            df.loc[i, "BAC"] = val_BAC[i]
-            df.loc[i, "eBAC"] = er_BAC[i]
-            df.loc[i, "ABC"] = val_ABC[i]
-            df.loc[i, "eABC"] = er_ABC[i]
-            df.loc[i, "baC"] = val_baC[i]
-            df.loc[i, "ebaC"] = er_baC[i]
-            df.loc[i, "abC"] = val_abC[i]
-            df.loc[i, "eabC"] = er_abC[i]
-            df.loc[i, "Ba"] = val_Ba[i]
-            df.loc[i, "eBa"] = er_Ba[i]
-            df.loc[i, "aB"] = val_aB[i]
-            df.loc[i, "eaB"] = er_aB[i]
-            df.loc[i, "bA"] = val_bA[i]
-            df.loc[i, "ebA"] = er_bA[i]
-            df.loc[i, "Ab"] = val_Ab[i]
-            df.loc[i, "eAb"] = er_Ab[i]
-
-        aggregated_df = pd.concat([aggregated_df, df], axis=0)
-        df.to_csv(f"{DATA_FOLDER}/lg_results_summary_layout_{LAYOUTS[layout_index]}.csv")
-
-    aggregated_df.to_csv(f"{DATA_FOLDER}/lg_results_aggregated_summary.csv")
+    df: pd.DataFrame = pd.DataFrame(all_rows)
+    df.to_csv(f"{results_dir}/lg_results_aggregated_summary.csv")
 
 
 if __name__ == "__main__":

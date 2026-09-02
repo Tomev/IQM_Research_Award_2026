@@ -17,11 +17,13 @@ uv sync
 
 Remember to set environmental variables. In particular:
 
-- IQM_TOKEN
-- IQM_PROVIDER
-- IQM_COMPUTER
+- `IQM_TOKEN`
+- `IQM_PROVIDER`
+- `IQM_COMPUTER`
 
 Also, ensure that `PYTHONPATH` contains the main folder of the project (or `'.'`).
+
+To run the analysis scripts setting `EXP_DATA_PATH` environmental variable is required.
 
 ## Running the scripts
 

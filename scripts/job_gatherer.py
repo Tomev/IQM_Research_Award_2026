@@ -14,11 +14,13 @@ from datetime import datetime
 
 from src.utils import gather_jobs
 
+SYSTEM_NAME: str = "emerald"
+
 
 def main() -> None:
     print(f"{datetime.now()}: Gathering jobs...")
-    jobs_summary_path: str = "data/gate_sirius/2026-07-27_213734_lg_jobs_summary.csv"
-    gather_jobs(jobs_summary_path)
+    jobs_summary_path: str = "data/2026-08-19_023826_lg_jobs_summary.csv"
+    gather_jobs(jobs_summary_path, SYSTEM_NAME)
 
 
 if __name__ == "__main__":

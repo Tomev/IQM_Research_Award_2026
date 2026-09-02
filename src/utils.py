@@ -6,6 +6,7 @@ import ast
 import json
 import os
 from datetime import datetime
+from typing import Any
 
 from iqm.qiskit_iqm import IQMBackend, transpile_to_IQM
 from iqm.qiskit_iqm.iqm_provider import IQMProvider
@@ -49,7 +50,7 @@ def star_device_transpile(circuit: QuantumCircuit, backend: IQMBackend, layout: 
     return compiled_qc
 
 
-def get_backend() -> IQMBackend:
+def get_backend(backend_name: str | None) -> IQMBackend:
     """
     Get the quantum backend from the IQM provider.
 
@@ -60,13 +61,16 @@ def get_backend() -> IQMBackend:
         EnvironmentError: If the required environment variables (`IQM_PROVIDER` or `IQM_COMPUTER`)
                           are not set.
     """
+    if not backend_name:
+        backend_name = os.environ["IQM_COMPUTER"]
+
     return IQMProvider(
         os.environ["IQM_PROVIDER"],
-        quantum_computer=os.environ["IQM_COMPUTER"],
+        quantum_computer=backend_name,
     ).get_backend()
 
 
-def gather_jobs(jobs_summary_path: str) -> None:
+def gather_jobs(jobs_summary_path: str, backend_name: str) -> None:
     """Gathers jobs from the quantum device based on a summary file.
 
     Reads a summary file containing job information, retrieves the corresponding jobs
@@ -77,7 +81,7 @@ def gather_jobs(jobs_summary_path: str) -> None:
                            and other metadata.
     """
     print(f"{datetime.now()}: Getting backend...")
-    backend: IQMBackend = get_backend()
+    backend: IQMBackend = get_backend(backend_name)
     print(f"{datetime.now()}: Downloading jobs...")
     jobs: list[LGACZ2] = download_jobs(extract_job_summaries(jobs_summary_path), backend)
     zip_file_name: str = f"{NOW}_iqm_lg_real_{backend.name}_results"
