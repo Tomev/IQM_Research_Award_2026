@@ -12,8 +12,8 @@ from iqm.qiskit_iqm.iqm_provider import IQMBackend
 from mthree import M3Mitigation
 from numpy.typing import NDArray
 
-from src.pipelines import get_layouts_from_layouts_info
-from src.utils import get_backend
+from iqm_benchmark.pipelines import get_layouts_from_layouts_info
+from iqm_benchmark.utils import get_backend
 
 # ---------------------------------------------------------------------------
 # settings

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Rectangle
 
-from src.pipelines import get_layouts_from_layouts_info
+from iqm_benchmark.pipelines import get_layouts_from_layouts_info
 
 plt.rcParams["text.usetex"] = True
 plt.rcParams["legend.loc"] = "lower right"

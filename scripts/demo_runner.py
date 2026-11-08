@@ -8,9 +8,9 @@ from typing import Any
 import pandas as pd
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
-from src.jobs import LGACZ2, Job
-from src.simulator import FakeFromBackend
-from src.utils import get_configuration_dicts
+from iqm_benchmark.jobs import LGACZ2, Job
+from iqm_benchmark.simulator import FakeFromBackend
+from iqm_benchmark.utils import get_configuration_dicts
 
 # TODO(TR): Refactor those settings.
 SYSTEM_NAME: str = "sirius"

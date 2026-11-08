@@ -7,9 +7,9 @@ from iqm.pulla.pulla import Pulla, PullaStash
 from iqm.pulla.utils_qiskit import qiskit_to_pulla
 from iqm.qiskit_iqm import IQMBackend
 
-from src.jobs import LGACZ2, Job
-from src.pipelines import prepare_lg_jobs
-from src.utils import get_backend
+from iqm_benchmark.jobs import LGACZ2, Job
+from iqm_benchmark.pipelines import prepare_lg_jobs
+from iqm_benchmark.utils import get_backend
 
 
 def compute_cz_amplitude_calibration_override(pulla: Pulla, amplitude_multiplier: float = 0.8) -> dict[str, float]:

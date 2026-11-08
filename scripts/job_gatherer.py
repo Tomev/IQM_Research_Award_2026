@@ -12,7 +12,7 @@ jobs, and when it completes execution. This is useful for monitoring and debuggi
 
 from datetime import datetime
 
-from src.utils import gather_jobs
+from iqm_benchmark.utils import gather_jobs
 
 SYSTEM_NAME: str = "emerald"
 

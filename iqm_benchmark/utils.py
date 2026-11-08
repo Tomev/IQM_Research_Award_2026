@@ -13,8 +13,8 @@ from iqm.qiskit_iqm.iqm_provider import IQMProvider
 from qiskit import transpile
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 
-from src.jobs import LGACZ2
-from src.simulator import download_system_configuration_json
+from iqm_benchmark.jobs import LGACZ2
+from iqm_benchmark.simulator import download_system_configuration_json
 
 N_REPETITIONS: int = 10
 NOW: str = datetime.now().strftime("%Y-%m-%d_%H%M%S")

@@ -5,7 +5,7 @@ noiseless pipeline, retrieves qubit layouts, and can be configured to run noisy 
 
 from datetime import datetime
 
-from src.pipelines import (
+from iqm_benchmark.pipelines import (
     PullaSettings,
     device_pipeline,
     get_layouts_from_layouts_info,
