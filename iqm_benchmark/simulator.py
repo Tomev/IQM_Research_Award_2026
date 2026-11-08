@@ -23,6 +23,9 @@ from numpy import average
 
 TimeType = Literal["t1_time", "t2_time"]
 
+# The list of valid gates was provided by the `IQMErrorProfile` error.
+VALID_GATES: tuple[str, ...] = ("move", "prx", "cc_prx", "cz")
+
 
 def get_architecture(system_name: str) -> StaticQuantumArchitecture:
     """Returns the static quantum architecture for the given system.
@@ -47,6 +50,24 @@ def get_architecture(system_name: str) -> StaticQuantumArchitecture:
         qubits=backend.architecture.qubits,
         computational_resonators=backend.architecture.computational_resonators,
         connectivity=get_coupling_map(backend),
+    )
+
+
+def create_static_architecture(architecture_dict: dict[str, Any], name: str = "Backend") -> StaticQuantumArchitecture:
+    # Each two-component gate locus is a coupler. Sorting puts the resonator first, as get_coupling_map does.
+    connectivity: dict[tuple[str, ...], None] = dict.fromkeys(
+        tuple(sorted(locus))
+        for gate in architecture_dict["gates"].values()
+        for implementation in gate["implementations"].values()
+        for locus in implementation["loci"]
+        if len(locus) == 2
+    )
+
+    return StaticQuantumArchitecture(
+        dut_label=f"Fake{name}",
+        qubits=architecture_dict["qubits"],
+        computational_resonators=architecture_dict["computational_resonators"],
+        connectivity=list(connectivity),
     )
 
 
@@ -82,7 +103,7 @@ def get_coupling_map(backend: IQMBackend) -> list[tuple[str, str]]:
 
 
 def get_error_profile(
-    system_name: str, calibration_dict: dict[str, Any], quality_dict: dict[str, Any]
+    backend_gates: dict[str, list[str]], calibration_dict: dict[str, Any], quality_dict: dict[str, Any]
 ) -> IQMErrorProfile:
     """Returns the error profile for the given system.
 
@@ -97,13 +118,6 @@ def get_error_profile(
     Returns:
         IQMErrorProfile: The error profile for the given system.
     """
-
-    backend: IQMBackend = IQMProvider(
-        os.environ["IQM_PROVIDER"],
-        quantum_computer=system_name,
-    ).get_backend()
-
-    backend_gates: dict[str, list[str]] = get_gates(backend)
 
     t1: dict[str, float] = get_ts(quality_dict, "t1_time")
 
@@ -171,26 +185,52 @@ def ensure_t2_correct(t1: dict[str, float], t2: dict[str, float]) -> dict[str, f
     return t2
 
 
-def get_gates(backend: IQMBackend) -> dict[str, list[str]]:
+def get_gates(backend_name: str) -> dict[str, list[str]]:
     """Returns a dictionary mapping backend-extracted gate info to lists of gate names supported by the backend.
 
     This function processes the gate information from the backend's architecture and categorizes the gates
     into single-qubit (1q) and two-qubit (2q) operations based on the number of `loci` specified in the gate data.
-
-    .. note::
-        The list of valid gates was provided by the `IQMErrorProfile` error.
     """
-    valid_gates: list[str] = ["move", "prx", "cc_prx", "cz"]
+    backend: IQMBackend = IQMProvider(
+        os.environ["IQM_PROVIDER"],
+        quantum_computer=backend_name,
+    ).get_backend()
 
     backend_gates: dict[str, list[str]] = {"1q": [], "2q": []}
 
     for gate_name, gate_data in backend.architecture.gates.items():
-        if gate_name not in valid_gates:  # Skip unavailable gates
+        if gate_name not in VALID_GATES:  # Skip unavailable gates
             continue
 
         backend_gates[f"{len(gate_data.loci[-1])}q"].append(gate_name)
 
     return backend_gates
+
+
+def get_gates_from_architecture(architecture_dict: dict[str, Any]) -> dict[str, list[str]]:
+    """Returns a dictionary mapping gate arity to the names of gates listed in the architecture dict.
+
+    This is the counterpart of :func:`get_gates` for an architecture loaded from a JSON file, for which no backend is
+    needed. Gates are categorized into single-qubit (1q) and two-qubit (2q) operations based on the size of the loci
+    of their default implementation.
+
+    Args:
+        architecture_dict:
+            A `dict` describing the architecture, with gates stored under the "gates" key.
+
+    Returns:
+        dict[str, list[str]]: The valid gates' names, under the "1q" and "2q" keys.
+    """
+    architecture_gates: dict[str, list[str]] = {"1q": [], "2q": []}
+
+    for gate_name, gate_data in architecture_dict["gates"].items():
+        if gate_name not in VALID_GATES:  # Skip unavailable gates
+            continue
+
+        loci: list[list[str]] = gate_data["implementations"][gate_data["default_implementation"]]["loci"]
+        architecture_gates[f"{len(loci[-1])}q"].append(gate_name)
+
+    return architecture_gates
 
 
 def compute_single_qubit_gates_depolarizing_error_parameters(
@@ -386,7 +426,7 @@ def FakeFromBackend(system_name: str, calibration_dict: dict[str, Any], quality_
 
     return IQMFakeBackend(
         get_architecture(system_name),
-        get_error_profile(system_name, calibration_dict, quality_dict),
+        get_error_profile(get_gates(system_name), calibration_dict, quality_dict),
         # name=f"Fake{system_name.capitalize()}",
         name=system_name,  # Keep the original name, so that we can use this FakeBackend in IQMStarCostEvaluator
     )
@@ -405,3 +445,18 @@ def FakeSirius(calibration_dict: dict[str, Any], quality_dict: dict[str, Any]) -
         IQMFakeBackend: A fake backend simulator for the `sirius` system.
     """
     return FakeFromBackend("sirius", calibration_dict, quality_dict)
+
+
+def FakeFromDicts(
+    architecture_dict: dict[str, Any],
+    calibration_dict: dict[str, Any],
+    quality_dict: dict[str, Any],
+    system_name: str = "FakeCustomBackend",
+) -> IQMFakeBackend:
+
+    return IQMFakeBackend(
+        create_static_architecture(architecture_dict),
+        get_error_profile(get_gates_from_architecture(architecture_dict), calibration_dict, quality_dict),
+        # name=f"Fake{system_name.capitalize()}",
+        name=system_name,  # Keep the original name, so that we can use this FakeBackend in IQMStarCostEvaluator
+    )
