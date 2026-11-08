@@ -20,7 +20,7 @@ from iqm.station_control.interface.models import ObservationSetWithObservations
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from tqdm import tqdm
 
-from src.utils import star_device_transpile
+from iqm_benchmark.utils import star_device_transpile
 
 
 def get_operation_errors(system_name: str) -> dict[str, float]:

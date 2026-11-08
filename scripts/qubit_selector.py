@@ -15,8 +15,8 @@ from iqm.qiskit_iqm import IQMBackend, IQMProvider
 from iqm.qubit_selector.qubit_selector import CostEvaluator
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 
-from src.jobs import LGACZ2
-from src.selector import IQMStarCostEvaluator
+from iqm_benchmark.jobs import LGACZ2
+from iqm_benchmark.selector import IQMStarCostEvaluator
 
 
 def get_lg_circuit() -> QuantumCircuit:

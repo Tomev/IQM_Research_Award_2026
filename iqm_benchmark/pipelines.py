@@ -27,10 +27,10 @@ from iqm.qubit_selector.qubit_selector import CostEvaluator
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit_aer import AerSimulator
 
-from src.jobs import LGACZ2, Job
-from src.selector import IQMStarCostEvaluator
-from src.simulator import FakeFromBackend
-from src.utils import get_backend, get_configuration_dicts, star_device_transpile
+from iqm_benchmark.jobs import LGACZ2, Job
+from iqm_benchmark.selector import IQMStarCostEvaluator
+from iqm_benchmark.simulator import FakeFromBackend
+from iqm_benchmark.utils import get_backend, get_configuration_dicts, star_device_transpile
 
 # TODO(TR): Refactor those settings.
 # There are 8 angles per layout in the job. This means the number of circuits in a single job is equal to
