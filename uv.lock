@@ -610,7 +610,7 @@ wheels = [
 [[package]]
 name = "iqm-research-award-2026"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "iqm-client", extra = ["qiskit"] },
     { name = "iqm-pulla", extra = ["qiskit"] },
@@ -621,9 +621,9 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "iqm-client", extras = ["qiskit"], specifier = ">=35.0.0" },
-    { name = "iqm-pulla", extras = ["qiskit"], specifier = ">=14.0.0" },
-    { name = "iqm-qubit-selector", specifier = ">=1.1.0" },
+    { name = "iqm-client", extras = ["qiskit"], specifier = ">=35.0.0,<36" },
+    { name = "iqm-pulla", extras = ["qiskit"], specifier = ">=14.0.0,<15" },
+    { name = "iqm-qubit-selector", specifier = ">=1.1.0,<1.2" },
     { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "mthree", specifier = ">=3.0.0" },
 ]
