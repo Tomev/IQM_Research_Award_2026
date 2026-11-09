@@ -67,12 +67,19 @@ class PullaSettings:
     prx_amplitude_multiplier: float | None = None
 
 
-def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> list[tuple[int, ...]]:
+def find_best_qubit_layouts(
+    backend: IQMBackendBase,
+    calibration_dict: dict[str, Any],
+    quality_dict: dict[str, Any],
+    n_layouts: int = 10,
+) -> list[tuple[int, ...]]:
     """
     Find the best qubit layouts for a given quantum circuit based on a cost evaluator.
 
     Args:
         backend: The quantum backend to use for evaluation.
+        calibration_dict: A `dict` containing the calibration set of the backend.
+        quality_dict: A `dict` containing the quality metrics of the backend.
         n_layouts: The number of top layouts to return.
 
     Returns:
@@ -94,7 +101,11 @@ def find_best_qubit_layouts(backend: IQMFakeBackend, n_layouts: int = 10) -> lis
     best_layouts: list[tuple[tuple[int, ...], float]] = []
 
     if backend.name == "sirius":
-        evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
+        # The evaluator builds its own fake backend, so pass it the architecture of the backend in the dict form.
+        architecture_dict: dict[str, Any] = backend.architecture.model_dump(mode="json")
+        evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(
+            architecture_dict, calibration_dict, quality_dict, circuit
+        )
         best_layouts = evaluator.get_top_layouts(n_layouts)
     else:
         layouts, costs = CostEvaluator(backend=get_backend(backend.name), quantum_circuit=circuit).get_top_layouts(
@@ -317,7 +328,7 @@ def noisy_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
     backend: IQMFakeBackend = FakeFromBackend(SYSTEM_NAME, calibration_dict, quality_dict)
     if len(qubits_lists) == 0:
         print(f"{datetime.now()}: Selecting best qubits list...")
-        qubits_lists = find_best_qubit_layouts(backend)
+        qubits_lists = find_best_qubit_layouts(backend, calibration_dict, quality_dict)
     print(f"{datetime.now()}: Preparing jobs...")
     jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
     print(f"{datetime.now()}: Running jobs...")
@@ -344,14 +355,16 @@ def device_pipeline(qubits_lists: list[list[int] | tuple[int, ...]]) -> None:
         :func:`prepare_lg_jobs` for job preparation.
     """
     print("Downloading configuration dicts...")
-    get_configuration_dicts(SYSTEM_NAME)  # Saves the system configuration during run.
+    calibration_dict: dict[str, Any]
+    quality_dict: dict[str, Any]
+    calibration_dict, quality_dict = get_configuration_dicts(SYSTEM_NAME)  # Saves the system configuration during run.
 
     print(f"{datetime.now()}: Preparing backend...")
     backend: IQMBackend = get_backend(SYSTEM_NAME)
 
     if len(qubits_lists) == 0:
         print(f"{datetime.now()}: Selecting best qubits list...")
-        qubits_lists = find_best_qubit_layouts(backend)
+        qubits_lists = find_best_qubit_layouts(backend, calibration_dict, quality_dict)
     print(f"{datetime.now()}: Preparing jobs...")
     jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
     print(f"{datetime.now()}: Running jobs...")
@@ -385,14 +398,16 @@ def pulla_pipeline(qubits_lists: list[list[int] | tuple[int, ...]], settings: Pu
         :func:`execute_with_pulla` for the core execution logic with Pulla.
     """
     print("Downloading configuration dicts...")
-    get_configuration_dicts(SYSTEM_NAME)  # Saves the system configuration during run.
+    calibration_dict: dict[str, Any]
+    quality_dict: dict[str, Any]
+    calibration_dict, quality_dict = get_configuration_dicts(SYSTEM_NAME)  # Saves the system configuration during run.
 
     print(f"{datetime.now()}: Preparing backend...")
     backend: IQMBackend = get_backend()
 
     if len(qubits_lists) == 0:
         print(f"{datetime.now()}: Selecting best qubits list...")
-        qubits_lists = find_best_qubit_layouts(backend)
+        qubits_lists = find_best_qubit_layouts(backend, calibration_dict, quality_dict)
     print(f"{datetime.now()}: Preparing jobs...")
     jobs: list[Job] = prepare_lg_jobs(qubits_lists, backend)
     print(f"{datetime.now()}: Execute jobs with pulla...")

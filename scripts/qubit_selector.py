@@ -10,6 +10,7 @@ placeholder for the original IQM Qubit Selector, which is currently not supporte
 """
 
 import os
+from typing import Any
 
 from iqm.qiskit_iqm import IQMBackend, IQMProvider
 from iqm.qubit_selector.qubit_selector import CostEvaluator
@@ -17,6 +18,7 @@ from qiskit.circuit.quantumcircuit import QuantumCircuit
 
 from iqm_benchmark.jobs import LGACZ2
 from iqm_benchmark.selector import IQMStarCostEvaluator
+from iqm_benchmark.utils import get_configuration_dicts
 
 
 def get_lg_circuit() -> QuantumCircuit:
@@ -48,7 +50,14 @@ def custom_qubit_seleciton() -> None:
     n_best_layouts: int = 10
     circuit: QuantumCircuit = get_lg_circuit()
 
-    cost_evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(backend, circuit)
+    calibration_dict: dict[str, Any]
+    quality_dict: dict[str, Any]
+    calibration_dict, quality_dict = get_configuration_dicts(os.environ["IQM_COMPUTER"])
+    architecture_dict: dict[str, Any] = backend.architecture.model_dump(mode="json")
+
+    cost_evaluator: IQMStarCostEvaluator = IQMStarCostEvaluator(
+        architecture_dict, calibration_dict, quality_dict, circuit
+    )
 
     best_layouts: list[tuple[tuple[int, ...], float]] = cost_evaluator.get_top_layouts(n_best_layouts)
 

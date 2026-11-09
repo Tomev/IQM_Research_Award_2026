@@ -7,52 +7,56 @@ The primary use case is to find optimal qubit layouts that minimize the total er
 errors of individual quantum operations such as PRX, measure, move, and CZ.
 
 Key components:
-- :func:`get_operation_errors`: Retrieves operation errors for a given quantum system.
+- :func:`get_operation_errors`: Retrieves operation errors from the configuration dicts of a quantum system.
 - :class:`IQMStarCostEvaluator`: Evaluates the cost of a quantum circuit based on operation errors.
 """
 
-import os
 from itertools import permutations
+from typing import Any
 
-from iqm.iqm_client import IQMClient
-from iqm.qiskit_iqm import IQMBackend
-from iqm.station_control.interface.models import ObservationSetWithObservations
+from iqm.qiskit_iqm.fake_backends.iqm_fake_backend import IQMFakeBackend
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from tqdm import tqdm
 
+from iqm_benchmark.simulator import FakeFromDicts
 from iqm_benchmark.utils import star_device_transpile
 
+# The operations that contribute to the circuit cost.
+COST_OPERATIONS: tuple[str, ...] = ("prx", "measure", "move", "cz")
 
-def get_operation_errors(system_name: str) -> dict[str, float]:
-    """Retrieves operation errors for a given quantum system.
+
+def get_operation_errors(calibration_dict: dict[str, Any], quality_dict: dict[str, Any]) -> dict[str, float]:
+    """Retrieves operation errors from the configuration dicts of a quantum system.
 
     The errors are calculated as (1 - fidelity), where fidelity represents the performance of quantum
     operations such as PRX, measure, move, and CZ.
+
+    Args:
+        calibration_dict:
+            A `dict` containing the calibration set. Not used at the moment, as all the fidelities are stored in the
+            quality metrics. It is accepted so that the function takes the same configuration as the simulator.
+        quality_dict:
+            A `dict` containing the quality metrics, with fidelities stored under the "observations" key.
+
+    Returns:
+        dict[str, float]: The errors, keyed by `<operation name>_<operation target>`, e.g. `cz_QB1__COMPR1`.
     """
-    client: IQMClient = IQMClient(
-        iqm_server_url=os.environ["IQM_PROVIDER"],
-        quantum_computer=system_name,
-    )
-
-    calibration_set: ObservationSetWithObservations = client.get_calibration_set()
-    quality_metric_set: ObservationSetWithObservations = client.get_quality_metric_set(
-        calibration_set.observation_set_id
-    )
-
     operation_errors: dict[str, float] = {}
 
-    for observation in quality_metric_set.observations:
-        if "qndness" in observation.dut_field:
+    for observation in quality_dict["observations"]:
+        dut_field: str = observation["dut_field"]
+
+        if "qndness" in dut_field:
             continue
 
-        if ".fidelity" in observation.dut_field:
-            operation_name: str = observation.dut_field.split(".")[2]
+        if ".fidelity" in dut_field:
+            operation_name: str = dut_field.split(".")[2]
 
-            if operation_name not in ["prx", "measure", "move", "cz"]:
+            if operation_name not in COST_OPERATIONS:
                 continue
-            operation_target = observation.dut_field.split(".")[-2]
+            operation_target: str = dut_field.split(".")[-2]
 
-            operation_errors[f"{operation_name}_{operation_target}"] = 1 - observation.value
+            operation_errors[f"{operation_name}_{operation_target}"] = 1 - observation["value"]
 
     return operation_errors
 
@@ -70,31 +74,41 @@ class IQMStarCostEvaluator:
         to find the best layouts. This approach may not account for all hardware-specific factors.
     """
 
-    def __init__(self, backend: IQMBackend, circuit: QuantumCircuit) -> None:
+    def __init__(
+        self,
+        architecture_dict: dict[str, Any],
+        calibration_dict: dict[str, Any],
+        quality_dict: dict[str, Any],
+        circuit: QuantumCircuit,
+    ) -> None:
         """Initializes the cost evaluator for a star-shaped topology backend.
 
         This evaluator is designed to work specifically with backends that have a star-shaped topology,
-        where all qubits are connected through a central resonator.
+        where all qubits are connected through a central resonator. The backend is not passed directly. Instead, a fake
+        one is built from the configuration dicts, so that the evaluator does not need access to the device.
 
         Args:
-            backend:
-                The quantum backend to use. Must have a star-shaped topology with a central resonator.
-                If not, a ValueError is raised.
+            architecture_dict:
+                A `dict` describing the architecture (qubits, computational resonators and gates). Must describe a
+                star-shaped topology with a central resonator. If not, a ValueError is raised.
+            calibration_dict:
+                A `dict` containing the calibration set.
+            quality_dict:
+                A `dict` containing the quality metrics.
             circuit:
                 The quantum circuit for which the cost is to be evaluated.
 
         Raises:
             ValueError:
-                If the backend does not have a central resonator, indicating that it is not compatible
+                If the architecture does not have a central resonator, indicating that it is not compatible
                 with the star-shaped topology required by this evaluator.
         """
+        if not architecture_dict["computational_resonators"]:
+            raise ValueError("Expected an architecture with a central resonator. Got one without resonators.")
 
-        if not backend.has_resonators():
-            raise ValueError(f"Expected a backend with a central resonator. Got {backend.name}.")
-
-        self.backend: IQMBackend = backend
+        self.backend: IQMFakeBackend = FakeFromDicts(architecture_dict, calibration_dict, quality_dict)
         self.circuit: QuantumCircuit = circuit
-        self.operation_errors: dict[str, float] = get_operation_errors(backend.name)
+        self.operation_errors: dict[str, float] = get_operation_errors(calibration_dict, quality_dict)
 
     def _compute_circuit_cost(self, circuit: QuantumCircuit) -> float:
         """Computes the total cost of a quantum circuit based on operation errors.
