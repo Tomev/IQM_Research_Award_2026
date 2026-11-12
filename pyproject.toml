@@ -4,14 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iqm-research-award-2026"
-version = "0.1.0"
+version = "0.1.1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "iqm-client[qiskit]>=35.0.0,<36",
-    "iqm-pulla[qiskit]>=14.0.0,<15",
-    "iqm-qubit-selector>=1.1.0,<1.2",
+    "iqm-client[qiskit]==37.0.0",
+    "iqm-pulla>=16.0.0",
     "matplotlib>=3.11.1",
     "mthree>=3.0.0",
 ]
@@ -20,10 +19,7 @@ dependencies = [
 packages = ["iqm_benchmark"]
 
 [tool.pyrefly]
-project-includes = [
-    "**/*.py*",
-    "**/*.ipynb",
-]
+project-includes = ["**/*.py*", "**/*.ipynb"]
 
 
 [tool.ruff]
